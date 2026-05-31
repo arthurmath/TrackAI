@@ -147,7 +147,7 @@
     }
 
     // Sphere vs AABB: returns {nx, nz, depth} if overlapping, else null.
-    function sphereAabb(sx, sz, r, bx, bz, bhx, bhz) {
+    function aabbSphere(bx, bz, bhx, bhz, sx, sz, r) {
       // Closest point on AABB to sphere center
       const cx = Math.max(bx - bhx, Math.min(sx, bx + bhx));
       const cz = Math.max(bz - bhz, Math.min(sz, bz + bhz));
@@ -184,6 +184,10 @@
       // Tiny-velocity damping
       if (Math.abs(pv.x) < 0.001) pv.x = 0;
       if (Math.abs(pv.z) < 0.001) pv.z = 0;
+
+      playerVsGreens();
+      playerVsBalls();
+      playerVsFences();
     }
 
     function playerVsFences() {
@@ -216,7 +220,7 @@
       const p = player.position;
       for (const ball of balls) {
         const b = ball.mesh.position;
-        const col = sphereAabb(b.x, b.z, BALL_R, p.x, p.z, PLAYER_HS, PLAYER_HS);
+        const col = aabbSphere(p.x, p.z, PLAYER_HS, PLAYER_HS, b.x, b.z, BALL_R);
         if (!col) continue;
         // Relative velocity along collision normal
         const relVn = (pv.x - ball.vx) * col.nx + (pv.z - ball.vz) * col.nz;
@@ -276,7 +280,7 @@
     function ballVsGreens(ball) {
       const b = ball.mesh.position;
       for (const g of greens) {
-        const col = sphereAabb(b.x, b.z, BALL_R, g.position.x, g.position.z, GREEN_HS, GREEN_HS);
+        const col = aabbSphere(g.position.x, g.position.z, GREEN_HS, GREEN_HS, b.x, b.z, BALL_R);
         if (!col) continue;
         b.x += col.nx * col.depth;
         b.z += col.nz * col.depth;
@@ -322,9 +326,6 @@
     // ─── Render loop ───────────────────────────────────────────────────────────
     function animate() {
       updatePlayer();
-      playerVsGreens();
-      playerVsBalls();
-      playerVsFences();
       updateBalls();
       renderer.render(scene, camera);
       requestAnimationFrame(animate);
