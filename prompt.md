@@ -28,7 +28,7 @@ Organize cleanly, e.g.:
 ai/
 game/
   public/
-    models/      (.glb car + track assets)
+    models/      (.glb cars + tracks assets)
     textures/
   src/
     core/        (game loop, time step, input manager)
@@ -39,6 +39,11 @@ game/
     ui/          (HUD, menus, leaderboard)
     utils/       (asset loader, glTF management)
 ```
+
+
+4. `src/engine/Physics.ts` — init Rapier WASM, création du world
+5. `src/vehicle/VehiclePhysics.ts` — implémentation complète du VehicleController Rapier
+6. `src/track/Track.ts` — chargement GLB + génération trimesh colliders
 
 
 ---
@@ -53,7 +58,7 @@ Utiliser le **`VehicleController` de Rapier.js** (implémentation Raycast Vehicl
 - **Moteur** : courbe d'accélération smooth réaliste, vitesse maximale, approximation simple de la vitesse de rotation/du couple.
 - **Frein/dérapage** : friction latérale réaliste, prise en compte d'un virage trop serré entrainant un dérapage contrôlé.
 - **Centre de gravité** bas et configurable** pour éviter le retournement
-- **Contrôle de l'assiette en vol** (réglage de l'assiette et du roulis en plein vol, à la manière de Trackmania).
+- **Contrôle de l'assiette en vol** réglage de l'assiette et du roulis en plein vol, à la manière de Trackmania.
 
 Chaque voiture aura ses propres paramètres. Paramètres de base à exposer dans les fichiers `vehicleConfig.ts` ou json :
 ```ts
@@ -128,7 +133,6 @@ Implémenter 3 modes de caméra toggleables avec `C` :
 
 1. **Chase cam** (défaut) : caméra derrière la voiture avec lag (lerp position + slerp rotation), légèrement surélevée
 2. **Hood cam** : caméra accrochée au capot (immersive, FPS)
-3. **Free orbit** : `OrbitControls` pour spectator/debug
 
 ---
 
@@ -174,14 +178,13 @@ Interface overlay en HTML/CSS positionné en absolute sur le canvas :
 ### Menu principal : 
 
 Jouer, IA (inference/train), Editeur (de tracks)
-Ne code pas la partie IA et editeur, mais met dans le menu principal.
+Ne code pas la partie IA et editeur, mais affiche les dans le menu principal.
 
 Boucle de jeu : Menu principal → Sélection de la voiture → Sélection du circuit → Chargement → Compte à rebours (3-2-1-GO) → Course → Arrivée → Résultats.
 
 - Sélection de circuit (liste de GLB dans `public/models/tracks/`)
 - Sélection de voiture (liste de GLB dans `public/models/cars/`)
 - Affichage des meilleurs temps locaux (`localStorage`)
-
 
 ### Pause Menu (Escape)
 - Resume / Restart / Retour au menu
@@ -208,11 +211,7 @@ Boucle de jeu : Menu principal → Sélection de la voiture → Sélection du ci
 
 1. `index.html` — canvas plein écran + div HUD overlay + loading screen
 2. `vite.config.ts` — avec `assetsInclude: ['**/*.glb', '**/*.hdr']`, WASM support pour Rapier (`optimizeDeps`)
-3. `src/main.ts` — init complète, scene setup, démarrage game loop
-4. `src/engine/Physics.ts` — init Rapier WASM, création du world
-5. `src/vehicle/VehiclePhysics.ts` — implémentation complète du VehicleController Rapier
-6. `src/track/Track.ts` — chargement GLB + génération trimesh colliders
-7. `src/ui/HUD.ts` — DOM overlay avec speedomètre SVG et timer
+3. `src/main.ts` 
 
 ---
 
@@ -223,16 +222,6 @@ En attendant les vrais assets GLB, générer des formes Three.js procédurales :
 - **Circuit** : une boucle ovale simple générée procéduralement avec `ExtrudeGeometry` le long d'une `CatmullRomCurve3`
 
 Cela permet de tester toute la physique et le gameplay avant d'intégrer les vrais assets.
-
----
-
-## Notes d'intégration Sketchfab
-
-Lors de l'import d'un modèle Sketchfab :
-1. Télécharger en format **glTF** (pas FBX, pas OBJ)
-2. Vérifier que les textures sont bien packagées dans le GLB (`Export as GLB`)
-3. Dans Blender : recentrer l'origine, appliquer les transformations (`Ctrl+A → All Transforms`), réorienter si nécessaire (`Y vers le haut = Z-up dans Three.js`)
-4. Exporter avec Draco compression (`Blender glTF exporter → Geometry → Draco`)
 
 ---
 
@@ -247,8 +236,8 @@ npm run build    # production build dans /dist
 ## Livrables
 1. Un projet entièrement exécutable (`npm install && npm run dev`) avec des ressources de remplacement afin qu'il fonctionne immédiatement.
 2. Un code TypeScript propre, commenté et modulaire.
-3. Pas de fichier `README.md` 
-4. Un fichier central `config.ts` pour régler les paramètres physiques, de caméra et graphiques.
+3. Un petit fichier `README.md` 
+4. Un fichier `config.ts` pour régler les paramètres physiques, de caméra et graphiques.
 
 
 ## Planning de développement
@@ -297,6 +286,16 @@ Car_Wheel_RR      → roue arrière droite
 Car_Window_*      → vitres (shader transparent)
 ```
 
+
+
+
+## Notes d'intégration Sketchfab
+
+Lors de l'import d'un modèle Sketchfab :
+1. Télécharger en format **glTF** (pas FBX, pas OBJ)
+2. Vérifier que les textures sont bien packagées dans le GLB (`Export as GLB`)
+3. Dans Blender : recentrer l'origine, appliquer les transformations (`Ctrl+A → All Transforms`), réorienter si nécessaire (`Y vers le haut = Z-up dans Three.js`)
+4. Exporter avec Draco compression (`Blender glTF exporter → Geometry → Draco`)
 
 
 

@@ -154,7 +154,7 @@
     );
     world.createCollider(
       RAPIER.ColliderDesc.cuboid(hx, WALL_HALF_H, hz)
-        .setRestitution(BOUNCE)
+        // .setRestitution(BOUNCE)
         .setFriction(0.2),
       body
     );
