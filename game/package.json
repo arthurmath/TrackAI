@@ -1,0 +1,22 @@
+{
+  "name": "raceai-game",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Jeu de voiture 3D web inspiré de Trackmania (Three.js + Rapier.js)",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.14.0",
+    "three": "^0.171.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.171.0",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.0"
+  }
+}

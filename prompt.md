@@ -2,7 +2,7 @@
 
 ## Contexte et objectif
 
-Développe un jeu de voiture 3D dans le navigateur, **single-player, entièrement local**, inspiré de Trackmania : circuits en boucle chronométrés, physique réaliste, sensation de vitesse, support d'assets 3D réalistes importés depuis Blender ou Sketchfab. L'environnement et les circuits doivent être visuellement cohérents et beaux. Le jeu doit tourner entièrement en frontend (SPA HTML simple + JS). Les données seront stockées dans `localStorage`/`IndexedDB`. Il y aura deux modes de jeu : soit par un humain, soit par un réseau de neurones pytorch qui s'entrainnera à conduire par Reinforcement Learning. La partie jeu sera dans le dossier game/, la partie python sera dans un dossier ai/. **N'écrit pas les fichiers de la partie python (ai/)**, mais fait un fichier controlleur avec HumanController et un AIControler communiquant via un serveur python Websocket.
+Développe un jeu de voiture 3D dans le navigateur, **single-player, entièrement local**, inspiré de Trackmania : circuits chronométrés, physique réaliste, sensation de vitesse, support d'assets 3D réalistes importés depuis Blender ou Sketchfab. L'environnement et les circuits doivent être visuellement cohérents et beaux. Le jeu doit tourner entièrement en frontend (SPA HTML simple + JS). Les données seront stockées dans `localStorage`/`IndexedDB`. Il y aura deux modes de jeu : soit par un humain, soit par un réseau de neurones pytorch qui s'entrainera à conduire par Reinforcement Learning. La partie jeu sera dans le dossier game/, la partie python sera dans un dossier ai/. **N'écrit pas les fichiers de la partie python (ai/)**, mais fait un fichier controlleur avec HumanController et un AIControler communiquant via un serveur python Websocket.
 
 ---
 
@@ -28,7 +28,7 @@ Organize cleanly, e.g.:
 ai/
 game/
   public/
-    models/      (.glb cars + tracks assets)
+    models/      (.glb cars, trees, tracks assets)
     textures/
   src/
     core/        (game loop, time step, input manager)
@@ -39,11 +39,6 @@ game/
     ui/          (HUD, menus, leaderboard)
     utils/       (asset loader, glTF management)
 ```
-
-
-4. `src/engine/Physics.ts` — init Rapier WASM, création du world
-5. `src/vehicle/VehiclePhysics.ts` — implémentation complète du VehicleController Rapier
-6. `src/track/Track.ts` — chargement GLB + génération trimesh colliders
 
 
 ---
@@ -58,7 +53,6 @@ Utiliser le **`VehicleController` de Rapier.js** (implémentation Raycast Vehicl
 - **Moteur** : courbe d'accélération smooth réaliste, vitesse maximale, approximation simple de la vitesse de rotation/du couple.
 - **Frein/dérapage** : friction latérale réaliste, prise en compte d'un virage trop serré entrainant un dérapage contrôlé.
 - **Centre de gravité** bas et configurable** pour éviter le retournement
-- **Contrôle de l'assiette en vol** réglage de l'assiette et du roulis en plein vol, à la manière de Trackmania.
 
 Chaque voiture aura ses propres paramètres. Paramètres de base à exposer dans les fichiers `vehicleConfig.ts` ou json :
 ```ts
@@ -103,25 +97,25 @@ Laisser la possibilité de l'activer/désactiver pour des raisons de performance
 
 ### Circuits
 
-- Les différents circuits seront stockés dans entities/tracks/track_1, track_2 etc. Dans chaque fichier, les informations suivantes seront présentes : la surface du terrain, le tracé du cricuit, les barrières autour du circuit, les positions et orientations des objects d'environnement posés autour du circuit (arbres etc. stockés en fichier .glb dans public/models/), le sky background, les lights, la gravité etc.
+- Les différents circuits seront stockés dans entities/tracks/track_1, track_2 etc. Dans chaque fichier, toutes les informations permettant de génerer le circuit seront présentes : la surface du terrain, le tracé du cricuit, les barrières autour du circuit, les positions et orientations des objects d'environnement posés autour du circuit (arbres etc. stockés en fichier .glb dans public/models/), le sky background, les lights, la gravité, adhérence de la route etc.
 - Les collisions Rapier sont générés automatiquement depuis les meshes via `ColliderDesc.trimesh()`
 - Construire au moins **un circuit de démonstration complet** comprenant : une ligne de départ, un circuit, une ligne d'arrivée.
 - Géométrie de collision dérivée du maillage du circuit (utiliser des colliders trimesh issus du glTF, ou des maillages de collision simplifiés).
-- Skybox + sol/environnement pour le contexte visuel.
+- Skybox + sol pour l'environnement visuel.
 
 ---
 
 ## Contrôles
 
-| Action                 | Clavier   | Gamepad                 |
-| ---------------------- | --------- | ----------------------- |
-| Accélérer              | `Z` / `↑` | Gâchette droite (R2/RT) |
-| Freiner/Marche arrière | `S` / `↓` | Gâchette gauche (L2/LT) |
-| Tourner gauche         | `Q` / `←` | Stick gauche            |
-| Tourner droite         | `D` / `→` | Stick gauche            |
-| Reset position         | `R`       | Bouton Y/Triangle       |
-| Pause                  | `Escape`  | Start                   |
-| Changer caméra         | `C`       | Cercle                  |
+| Action                 | Clavier   |
+| ---------------------- | --------- |
+| Accélérer              | `Z` / `↑` |
+| Freiner/Marche arrière | `S` / `↓` |
+| Tourner gauche         | `Q` / `←` |
+| Tourner droite         | `D` / `→` |
+| Reset position         | `R`       |
+| Pause                  | `Escape`  |
+| Changer caméra         | `C`       |
 
 ---
 
@@ -143,10 +137,6 @@ Implémenter 3 modes de caméra toggleables avec `C` :
 - Circuit en boucle : Compteur de tours (ex : 3 laps)
 - Affichage du delta au meilleur temps précédent (+/- XX.XXX)
 
-### Respawn
-- Détection de voiture retournée pendant > 2s
-- Respawn au début du circuit avec vitesse nulle (animation de fondu)
-
 ### Reset instantané
 - Touche `R` → replace la voiture au début immédiatement
 
@@ -154,7 +144,6 @@ Implémenter 3 modes de caméra toggleables avec `C` :
 
 ## HUD (DOM overlay, pas Three.js)
 
-**State/UI:** Lightweight — vanilla TS + HTML/CSS overlay. Keep the game loop decoupled from UI.
 Interface overlay en HTML/CSS positionné en absolute sur le canvas :
 
 ```
@@ -170,6 +159,7 @@ Interface overlay en HTML/CSS positionné en absolute sur le canvas :
 - Temps actuel, vitesse (km/h), écart actuel par rapport au meilleur temps.
 - Speedomètre en arc SVG animé
 - Delta au meilleur temps en vert/rouge selon +/-
+- Keep the game loop decoupled from UI
 
 ---
 
@@ -177,7 +167,7 @@ Interface overlay en HTML/CSS positionné en absolute sur le canvas :
 
 ### Menu principal : 
 
-Jouer, IA (inference/train), Editeur (de tracks)
+Jouer, IA (inference/train), Editeur (de tracks).
 Ne code pas la partie IA et editeur, mais affiche les dans le menu principal.
 
 Boucle de jeu : Menu principal → Sélection de la voiture → Sélection du circuit → Chargement → Compte à rebours (3-2-1-GO) → Course → Arrivée → Résultats.
@@ -204,15 +194,6 @@ Boucle de jeu : Menu principal → Sélection de la voiture → Sélection du ci
 - Le mobile n'est **pas** ciblé ; optimisation pour les navigateurs de bureau (dernières versions de Chrome).
 
 
-
----
-
-## Fichiers de démarrage à générer
-
-1. `index.html` — canvas plein écran + div HUD overlay + loading screen
-2. `vite.config.ts` — avec `assetsInclude: ['**/*.glb', '**/*.hdr']`, WASM support pour Rapier (`optimizeDeps`)
-3. `src/main.ts` 
-
 ---
 
 ## Assets de placeholder
@@ -238,6 +219,9 @@ npm run build    # production build dans /dist
 2. Un code TypeScript propre, commenté et modulaire.
 3. Un petit fichier `README.md` 
 4. Un fichier `config.ts` pour régler les paramètres physiques, de caméra et graphiques.
+5. `index.html` 
+6. `vite.config.ts` — avec `assetsInclude: ['**/*.glb', '**/*.hdr']`, WASM support pour Rapier (`optimizeDeps`)
+7. `src/main.ts` 
 
 
 ## Planning de développement
@@ -248,7 +232,7 @@ npm run build    # production build dans /dist
 5. HUD, états du jeu, compte à rebours, écran de résultats.
 6. Peaufinage graphique (PBR, ombres, post-traitement) + documentation sur le remplacement des ressources.
 
-Commencez par la phase 1 avec un plan clair, puis construisez progressivement. Donnez la priorité à une **excellente sensation de conduite** ainsi qu'à un environnement graphique visuellement beau avant toute autre chose.
+Donnez la priorité à une **excellente sensation de conduite** ainsi qu'à un environnement graphique visuellement beau avant toute autre chose.
 
 
 
@@ -262,29 +246,22 @@ Commencez par la phase 1 avec un plan clair, puis construisez progressivement. D
 ## Prochaines étapes : 
 
 - Track : changements d'altitude, des virages inclinés, un saut/une rampe, et une boucle ou un boost pad si possible.
+- **Plateformes de boost** et **surfaces modifiant la vitesse** (par exemple, zones à faible adhérence / de terre) en option.
 - **4 roues** avec paramètres configurables : suspension travel, stiffness, damping, friction. Animation des roues : rotation de direction sur les roues avant + rotation de roulement sur toutes les roues en fonction de la vitesse.
 - Ghost car (meilleur temps) : Enregistrement de la position/rotation toutes les 100ms via un `GhostRecorder`, Stockage dans `localStorage` (format JSON compressé), Replay transparent (mesh semi-transparent) pendant la course suivante.
-- Prévoir un cycle jour/nuit toggle
 - Effets particules : Fumée de pneus au freinage/dérapage, Poussière au dépassement des bordures
-- - **Système de checkpoints :** A mettre dans src/track/Checkpoint.ts. Volumes de déclenchement invisibles ; doivent être franchis dans l'ordre ; chronométrage intermédiaire (écart en temps réel par rapport au record personnel (vert/rouge)). Permettra le respawn si reset (touche R) ou si voiture retournée.
-- **Plateformes de boost** et **surfaces modifiant la vitesse** (par exemple, zones à faible adhérence / de terre) en option, à la manière de Trackmania.
-- - **Prise en charge de la manette** via l'API Gamepad (direction/accélérateur analogiques) — important pour les sensations. Rendre la couche d'entrée abstraite afin que le clavier et la manette fournissent les mêmes valeurs de contrôle.
+- **Système de checkpoints :** A mettre dans src/track/Checkpoint.ts. Volumes de déclenchement invisibles ; doivent être franchis dans l'ordre ; chronométrage intermédiaire (écart en temps réel par rapport au record personnel (vert/rouge)). Permettra le respawn si reset (touche R) ou si voiture retournée.
+- **Prise en charge de la manette** via l'API Gamepad (direction/accélérateur analogiques) — important pour les sensations. Rendre la couche d'entrée abstraite afin que le clavier et la manette fournissent les mêmes valeurs de contrôle.
 - Minimap (facultatif, top-down orthographic render sur render target séparé)
 - frein arrière différentiel pour le handbrake (touche Space)
-- Modèle de frottement des pneus avec adhérence longitudinale et latérale distinctes
 - Appui aérodynamique/traînée aérodynamique affectant la maniabilité à grande vitesse.
 - Audio/Musique/Effet sonores
+- Prévoir un cycle jour/nuit 
 - Le circuit est un GLB unique exporté depuis Blender/Sketchfab. Nommer les meshes : `Track_Road`, `Track_Wall`, `Track_Decoration_*`, `Track_Ramp_*`
-
-Convention de nommage GLB (Blender) : Toutes les parties de la voiture doivent être nommées selon cette convention dans Blender avant export :
-```
-Car_Body          → mesh principal
-Car_Wheel_FL      → roue avant gauche
-Car_Wheel_FR      → roue avant droite
-Car_Wheel_RL      → roue arrière gauche
-Car_Wheel_RR      → roue arrière droite
-Car_Window_*      → vitres (shader transparent)
-```
+- **Contrôle de l'assiette en vol** réglage de l'assiette et du roulis en plein vol, à la manière de Trackmania.
+- Respawn
+- Détection de voiture retournée pendant > 2s
+- Respawn au début du circuit avec vitesse nulle (animation de fondu)
 
 
 
@@ -302,6 +279,5 @@ Lors de l'import d'un modèle Sketchfab :
 
 ## Questions : 
 
-C'est quoi les commandes pour jouer à trackmania sur ordi ? 
-dérapages ? mariokart ? Trackmania ? réalistes ?
+TrackAI
 Demander quel algorithme de Reinforcement Learning est le plus adapté à ce jeu 
