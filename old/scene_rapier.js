@@ -1,8 +1,6 @@
 // Rapier-backed version of scene.js — swap script in scene.html: scene.js → rapier.js
 (async () => {
-  const RAPIER = (await import(
-    'https://esm.sh/@dimforge/rapier3d-compat@0.14.0'
-  )).default;
+  const RAPIER = (await import('https://esm.sh/@dimforge/rapier3d-compat@0.14.0')).default;
   await RAPIER.init();
 
 
