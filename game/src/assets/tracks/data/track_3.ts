@@ -11,7 +11,7 @@
  * Eclairage : floodlights de stade — ambiance nocturne froide, lumière
  * zenitale intense, légère brume bleutée pour la profondeur.
  */
-import type { TrackDefinition } from './types';
+import type { TrackDefinition } from '../types';
 
 /**
  * Oval inspiré d'un circuit de speedway, dimensionné pour tenir à l'intérieur
@@ -30,7 +30,7 @@ const CENTERLINE = [
   { x: 32, y: 0.4, z: -8 },
   // --- Longue droite Sud ---
   { x: 20, y: 0.4, z: -18 },
-  { x: 5,  y: 0.4, z: -24 },
+  { x: 5, y: 0.4, z: -24 },
   { x: -5, y: 0.4, z: -24 },
   { x: -20, y: 0.4, z: -18 },
   // --- Virage Ouest (x < 0) ---
@@ -40,9 +40,9 @@ const CENTERLINE = [
   { x: -32, y: 0.4, z: 8 },
   // --- Longue droite Nord ---
   { x: -20, y: 0.4, z: 18 },
-  { x: -5,  y: 0.4, z: 24 },
-  { x: 5,   y: 0.4, z: 24 },
-  { x: 20,  y: 0.4, z: 18 },
+  { x: -5, y: 0.4, z: 24 },
+  { x: 5, y: 0.4, z: 24 },
+  { x: 20, y: 0.4, z: 18 },
 ];
 
 export const track_3: TrackDefinition = {
@@ -60,10 +60,7 @@ export const track_3: TrackDefinition = {
   roadFriction: 1.05,
   gravity: { x: 0, y: -9.81, z: 0 },
 
-  /**
-   * Le sol procédural sert de filet de sécurité physique (empêche les voitures
-   * de tomber si elles quittent la piste) ; il n'est pas affiché (useGLB=true).
-   */
+  /** Sol physique invisible (filet de sécurité sous le terrain du stade). */
   groundSize: 600,
   groundColor: 0x1a3d0a,
 
@@ -81,17 +78,32 @@ export const track_3: TrackDefinition = {
     sunDirection: { x: 0.1, y: 1.0, z: 0.15 },
   },
 
+  /** Projecteur central omnidirectionnel au-dessus du terrain. */
+  lights: [
+    {
+      type: 'point',
+      position: { x: 0, y: 60, z: 0 },
+      color: 0xfff8e8,
+      intensity: 1500,
+      distance: 0,
+      decay: 1,
+    },
+  ],
+
   decorations: [],
 
   /** La ligne de départ est placée au milieu de la droite Nord. */
   startU: 0.85,
 
-  /** Modèle 3D du stade (remplace les maillages visuels procéduraux). */
+  /** Modèle 3D du stade (décor uniquement — la piste reste procédurale). */
   modelPath: '/models/tracks/stadium/source/wc1.glb',
 
   /**
    * Facteur d'échelle ×5 : le modèle natif (~36 m) est porté à ~180 m,
    * offrant un cadre visuel imposant qui entoure le circuit sans l'écraser.
    */
-  modelScale: 5,
+  modelScale: 7,
+
+  /** Route asphaltée + barrières latéraires visibles par-dessus le GLB. */
+  showProceduralTrack: true,
 };

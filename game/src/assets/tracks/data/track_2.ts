@@ -2,21 +2,20 @@
  * track_2 — "Midnight Circuit" : tracé plus technique et serré, ambiance
  * nocturne fraîche. Démontre la variété de configuration des circuits.
  */
-import type { TrackDefinition, DecorationInstance } from './types';
+import type { TrackDefinition, DecorationInstance } from '../types';
 
 const CENTERLINE = [
-  { x: 0, y: 0, z: 45 },
-  { x: 35, y: 0, z: 40 },
-  { x: 45, y: 0, z: 10 },
-  { x: 20, y: 0, z: -5 },
-  { x: 35, y: 0, z: -35 },
-  { x: 60, y: 0, z: -55 },
-  { x: 30, y: 0, z: -80 },
-  { x: -15, y: 0, z: -70 },
-  { x: -45, y: 0, z: -40 },
-  { x: -20, y: 0, z: -10 },
-  { x: -50, y: 0, z: 15 },
-  { x: -40, y: 0, z: 48 },
+  { x: 0, y: 0, z: 60 },
+  { x: 40, y: 0, z: 55 },
+  { x: 70, y: 0, z: 20 },
+  { x: 75, y: 0, z: -20 },
+  { x: 50, y: 0, z: -55 },
+  { x: 10, y: 0, z: -70 },
+  { x: -30, y: 0, z: -60 },
+  { x: -65, y: 0, z: -30 },
+  { x: -75, y: 0, z: 10 },
+  { x: -55, y: 0, z: 45 },
+  { x: -20, y: 0, z: 62 },
 ];
 
 function buildDecorations(): DecorationInstance[] {

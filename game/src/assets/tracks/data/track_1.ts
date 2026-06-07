@@ -1,22 +1,23 @@
 /**
- * track_1 — "Sunset Oval" : une boucle fermée fluide, terrain plat, ambiance
- * de fin d'après-midi. Circuit de démonstration complet (départ/arrivée + tours).
+ * track_1 — "Sunset Oval" : une boucle fermée fluide, terrain plat, ciel
+ * diurne. Circuit de démonstration complet (départ/arrivée + tours).
  */
-import type { TrackDefinition, DecorationInstance } from './types';
+import type { TrackDefinition, DecorationInstance } from '../types';
 
 // Boucle fermée : alternance de longues lignes droites et de virages amples.
 const CENTERLINE = [
-  { x: 0, y: 0, z: 60 },
-  { x: 40, y: 0, z: 55 },
-  { x: 70, y: 0, z: 20 },
-  { x: 75, y: 0, z: -20 },
-  { x: 50, y: 0, z: -55 },
-  { x: 10, y: 0, z: -70 },
-  { x: -30, y: 0, z: -60 },
-  { x: -65, y: 0, z: -30 },
-  { x: -75, y: 0, z: 10 },
-  { x: -55, y: 0, z: 45 },
-  { x: -20, y: 0, z: 62 },
+  { x: 0, y: 0, z: 45 },
+  { x: 35, y: 0, z: 40 },
+  { x: 45, y: 0, z: 10 },
+  { x: 20, y: 0, z: -5 },
+  { x: 35, y: 0, z: -35 },
+  { x: 60, y: 0, z: -55 },
+  { x: 30, y: 0, z: -80 },
+  { x: -15, y: 0, z: -70 },
+  { x: -45, y: 0, z: -40 },
+  { x: -20, y: 0, z: -10 },
+  { x: -50, y: 0, z: 15 },
+  { x: -40, y: 0, z: 48 },
 ];
 
 // Décor : couronne d'arbres et quelques rochers répartis autour du circuit.
@@ -49,14 +50,14 @@ export const track_1: TrackDefinition = {
   groundSize: 700,
   groundColor: 0x4a6b3a,
   lighting: {
-    skyColor: 0xffb27a,
+    skyColor: 0x6eb5e8,
     groundColor: 0x3a4a2a,
-    fogColor: 0xffc59a,
-    ambientColor: 0xffd9b3,
-    ambientIntensity: 0.5,
-    hemiIntensity: 0.7,
-    sunColor: 0xffe2b0,
-    sunIntensity: 3.2,
+    fogColor: 0xb8daf0,
+    ambientColor: 0xc8dff5,
+    ambientIntensity: 0.55,
+    hemiIntensity: 0.65,
+    sunColor: 0xfff4e0,
+    sunIntensity: 2.8,
     sunDirection: { x: -0.5, y: 0.45, z: -0.3 },
   },
   decorations: buildDecorations(),

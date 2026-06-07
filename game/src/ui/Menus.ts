@@ -3,10 +3,10 @@
  * sélection circuit, chargement, pause et résultats. Chaque écran est rendu
  * dans un conteneur dédié et communique via des callbacks.
  */
-import type { VehicleConfig } from '../physics/vehicleConfig';
-import type { TrackDefinition } from '../entities/tracks/types';
+import type { VehicleConfig } from '../assets/cars/types';
+import type { TrackDefinition } from '../assets/tracks/types';
 import type { RaceSnapshot } from '../game/Race';
-import { formatTime } from '../game/format';
+import { formatTime } from '../utils/format';
 import { getBestTimeMs } from '../game/Storage';
 
 export class Menus {

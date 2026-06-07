@@ -7,12 +7,12 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import { PhysicsWorld } from '../physics/PhysicsWorld';
 import { VehicleController, type VehicleSpawn } from '../physics/VehicleController';
-import { TrackFactory, type BuiltTrack } from '../assets/TrackFactory';
-import { VehicleView } from '../assets/VehicleView';
+import { TrackConstructor, type BuiltTrack } from '../assets/tracks/TrackConstructor';
+import { CarConstructor, type VehicleView } from '../assets/cars/CarConstructor';
 import { AssetLoader } from '../utils/AssetLoader';
 import { Race } from './Race';
-import type { VehicleConfig } from '../physics/vehicleConfig';
-import type { TrackDefinition } from '../entities/tracks/types';
+import type { VehicleConfig } from '../assets/cars/types';
+import type { TrackDefinition } from '../assets/tracks/types';
 import type { Controller, VehicleObservation } from '../controllers/Controller';
 import type { Lighting } from '../rendering/Lighting';
 import type { WheelTransform } from '../physics/VehicleController';
@@ -60,9 +60,13 @@ export class RaceSession {
   ): Promise<RaceSession> {
     const physics = new PhysicsWorld(trackDef.gravity);
     const assetLoader = new AssetLoader();
-    const factory = new TrackFactory(physics.world, scene, assetLoader);
-    const track = await factory.build(trackDef);
-    return new RaceSession(scene, lighting, vehicleConfig, trackDef, controller, physics, track);
+    const trackFactory = new TrackConstructor(physics.world, scene, assetLoader);
+    const carFactory = new CarConstructor(assetLoader);
+    const [track, view] = await Promise.all([
+      trackFactory.build(trackDef),
+      carFactory.build(vehicleConfig),
+    ]);
+    return new RaceSession(scene, lighting, vehicleConfig, trackDef, controller, physics, track, view);
   }
 
   private constructor(
@@ -73,6 +77,7 @@ export class RaceSession {
     controller: Controller,
     physics: PhysicsWorld,
     track: BuiltTrack,
+    view: VehicleView,
   ) {
     this.physics = physics;
     this.track = track;
@@ -84,7 +89,7 @@ export class RaceSession {
     const spawn: VehicleSpawn = this.track.spawn;
     this.vehicle = new VehicleController(this.physics.world, vehicleConfig, spawn);
 
-    this.view = new VehicleView(vehicleConfig);
+    this.view = view;
     scene.add(this.view.group);
 
     this.race = new Race(trackDef.id, vehicleConfig.id);

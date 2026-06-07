@@ -34,7 +34,7 @@ export const GRAPHICS_CONFIG = {
   shadows: true,
   shadowMapSize: 2048,
   /** Active le post-processing (bloom + motion blur). */
-  postProcessing: true,
+  postProcessing: false,
   bloom: {
     enabled: true,
     strength: 0.45,

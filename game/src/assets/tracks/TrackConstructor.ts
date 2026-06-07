@@ -1,5 +1,5 @@
 /**
- * TrackFactory — construit un circuit jouable à partir d'une TrackDefinition :
+ * TrackConstructor — construit un circuit jouable à partir d'une TrackDefinition :
  *  - route (ruban extrudé le long d'une CatmullRomCurve3) + collider trimesh
  *  - barrières latérales + colliders trimesh
  *  - sol + ciel/brouillard (via Lighting), décor (arbres/rochers placeholder)
@@ -10,9 +10,9 @@
  */
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
-import type { TrackDefinition } from '../entities/tracks/types';
-import type { VehicleSpawn } from '../physics/VehicleController';
-import { AssetLoader } from '../utils/AssetLoader';
+import type { TrackDefinition } from './types';
+import type { VehicleSpawn } from '../../physics/VehicleController';
+import { AssetLoader } from '../../utils/AssetLoader';
 
 export interface BuiltTrack {
   group: THREE.Group;
@@ -28,17 +28,18 @@ export interface BuiltTrack {
 
 const UP = new THREE.Vector3(0, 1, 0);
 
-export class TrackFactory {
+export class TrackConstructor {
   constructor(
     private readonly world: RAPIER.World,
     private readonly scene: THREE.Scene,
     private readonly assetLoader?: AssetLoader,
-  ) {}
+  ) { }
 
   async build(def: TrackDefinition): Promise<BuiltTrack> {
     // Quand un modèle GLB est fourni, les maillages visuels procéduraux sont
-    // masqués (le GLB remplace le visuel) mais les colliders physiques restent.
+    // masqués (le GLB remplace le visuel) sauf si showProceduralTrack est activé.
     const useGLB = !!def.modelPath;
+    const showTrackVisuals = !useGLB || !!def.showProceduralTrack;
 
     const group = new THREE.Group();
     group.name = `track_${def.id}`;
@@ -73,11 +74,11 @@ export class TrackFactory {
     }
 
     // --- Route ---
-    this.buildRoad(group, trackBody, leftEdge, rightEdge, def, !useGLB);
+    this.buildRoad(group, trackBody, leftEdge, rightEdge, def, showTrackVisuals);
 
     // --- Barrières ---
-    this.buildBarrier(group, trackBody, leftEdge, def.barrierHeight, 0x3344ff, !useGLB);
-    this.buildBarrier(group, trackBody, rightEdge, def.barrierHeight, 0xff3344, !useGLB);
+    this.buildBarrier(group, trackBody, leftEdge, def.barrierHeight, 0x3344ff, showTrackVisuals);
+    this.buildBarrier(group, trackBody, rightEdge, def.barrierHeight, 0xff3344, showTrackVisuals);
 
     // --- Sol ---
     this.buildGround(group, trackBody, def, !useGLB);
@@ -86,6 +87,8 @@ export class TrackFactory {
     if (!useGLB) {
       this.buildDecorations(group, def);
     }
+
+    this.buildLights(group, def);
 
     // --- Ligne de départ / arrivée ---
     const startU = def.startU ?? 0;
@@ -146,6 +149,11 @@ export class TrackFactory {
     const dispose = (): void => {
       this.scene.remove(group);
       group.traverse((o) => {
+        const light = o as THREE.Light;
+        if (light.isLight) {
+          light.dispose();
+          return;
+        }
         const m = o as THREE.Mesh;
         if (m.isMesh) {
           m.geometry?.dispose();
@@ -172,11 +180,11 @@ export class TrackFactory {
     const positions: number[] = [];
     const uvs: number[] = [];
     const indices: number[] = [];
-    const y = 0.02;
 
     for (let i = 0; i < N; i++) {
+      const y = left[i].y + 0.02;
       positions.push(left[i].x, y, left[i].z);
-      positions.push(right[i].x, y, right[i].z);
+      positions.push(right[i].x, right[i].y + 0.02, right[i].z);
       const v = i / N;
       uvs.push(0, v * 40, 1, v * 40);
     }
@@ -197,8 +205,8 @@ export class TrackFactory {
     geo.computeVertexNormals();
 
     const mat = new THREE.MeshStandardMaterial({
-      color: 0x2b2b30,
-      roughness: 0.95,
+      color: 0x080808,
+      roughness: 0.98,
       metalness: 0.0,
     });
     const mesh = new THREE.Mesh(geo, mat);
@@ -227,8 +235,8 @@ export class TrackFactory {
     const positions: number[] = [];
     const indices: number[] = [];
     for (let i = 0; i < N; i++) {
-      positions.push(edge[i].x, 0, edge[i].z); // bas
-      positions.push(edge[i].x, height, edge[i].z); // haut
+      positions.push(edge[i].x, edge[i].y, edge[i].z); // bas
+      positions.push(edge[i].x, edge[i].y + height, edge[i].z); // haut
     }
     for (let i = 0; i < N; i++) {
       const j = (i + 1) % N;
@@ -288,6 +296,20 @@ export class TrackFactory {
     this.world.createCollider(collider, body);
   }
 
+  private buildLights(group: THREE.Group, def: TrackDefinition): void {
+    if (!def.lights?.length) return;
+
+    const lightsGroup = new THREE.Group();
+    lightsGroup.name = 'lights';
+    for (const spec of def.lights) {
+      if (spec.type !== 'point') continue;
+      const light = new THREE.PointLight(spec.color, spec.intensity, spec.distance ?? 0, spec.decay ?? 2);
+      light.position.set(spec.position.x, spec.position.y, spec.position.z);
+      lightsGroup.add(light);
+    }
+    group.add(lightsGroup);
+  }
+
   private buildDecorations(group: THREE.Group, def: TrackDefinition): void {
     if (def.decorations.length === 0) return;
 
@@ -312,9 +334,9 @@ export class TrackFactory {
       } else {
         const tree = new THREE.Group();
         const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-        trunk.position.y = 1.1 * s;
+        trunk.position.y = 1.1;
         const foliage = new THREE.Mesh(foliageGeo, foliageMat);
-        foliage.position.y = 3.2 * s;
+        foliage.position.y = 3.95;
         trunk.castShadow = true;
         foliage.castShadow = true;
         tree.add(trunk, foliage);

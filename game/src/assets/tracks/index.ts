@@ -1,8 +1,8 @@
 /** Registre des circuits disponibles. */
 import type { TrackDefinition } from './types';
-import { track_1 } from './track_1';
-import { track_2 } from './track_2';
-import { track_3 } from './track_3';
+import { track_1 } from './data/track_1';
+import { track_2 } from './data/track_2';
+import { track_3 } from './data/track_3';
 
 export const TRACKS: TrackDefinition[] = [track_1, track_2, track_3];
 

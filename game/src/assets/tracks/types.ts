@@ -31,6 +31,17 @@ export interface DecorationInstance {
   scale?: number;
 }
 
+/** Source lumineuse ponctuelle (émission omnidirectionnelle). */
+export interface TrackPointLight {
+  type: 'point';
+  position: Vec3;
+  color: number;
+  intensity: number;
+  /** Portée en mètres (0 = illimitée). */
+  distance?: number;
+  decay?: number;
+}
+
 export interface TrackDefinition {
   id: string;
   name: string;
@@ -56,12 +67,19 @@ export interface TrackDefinition {
   groundColor: number;
 
   lighting: TrackLighting;
+  /** Sources lumineuses locales (projecteurs, spots de stade, etc.). */
+  lights?: TrackPointLight[];
   decorations: DecorationInstance[];
 
   /** GLB optionnel : si fourni, remplace la génération procédurale visuelle. */
   modelPath?: string;
   /** Facteur d'échelle appliqué au modèle GLB (1 par défaut). */
   modelScale?: number;
+  /**
+   * Affiche la route et les barrières procédurales même quand un GLB est chargé.
+   * Utile quand le modèle ne fournit que le décor (stade, paysage…) sans piste.
+   */
+  showProceduralTrack?: boolean;
 
   /** Position de départ le long de la courbe [0..1]. */
   startU?: number;

@@ -8,7 +8,7 @@
  */
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
-import type { VehicleConfig } from './vehicleConfig';
+import type { VehicleConfig } from '../assets/cars/types';
 import type { ControlState } from '../controllers/Controller';
 
 export interface WheelTransform {
@@ -124,7 +124,7 @@ export class VehicleController {
     const speed = Math.abs(this.forwardSpeed);
 
     // --- Braquage progressif avec réduction à haute vitesse ---
-    const speedFactor = 1 / (1 + speed * 0.035);
+    const speedFactor = 1 / (1 + speed * 0.01);
     const targetSteering = -control.steer * cfg.maxSteering * speedFactor;
     // Retour au centre / approche progressive (lerpAngle).
     const steerLerp = control.steer === 0 ? 8 * dt : 6 * dt;

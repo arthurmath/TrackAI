@@ -23,7 +23,6 @@ Développe un jeu de voiture 3D dans le navigateur, **single-player, entièremen
 
 ## Architecture du projet
 
-Organize cleanly, e.g.:
 ```
 ai/
 game/

@@ -3,7 +3,7 @@
  * temps, delta coloré et compteur de vitesse en arc SVG animé.
  */
 import type { RaceSnapshot } from '../game/Race';
-import { formatTime, formatDelta } from '../game/format';
+import { formatTime, formatDelta } from '../utils/format';
 
 const SPEEDO_MAX_KMH = 320;
 const ARC_RADIUS = 80;

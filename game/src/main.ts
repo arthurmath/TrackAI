@@ -19,8 +19,8 @@ import { Menus } from './ui/Menus';
 import { HUD } from './ui/HUD';
 import { Countdown } from './ui/Countdown';
 import { DebugOverlay } from './ui/DebugOverlay';
-import { VEHICLES, DEFAULT_VEHICLE_ID } from './physics/vehicleConfig';
-import { TRACKS, getTrackById, DEFAULT_TRACK_ID } from './entities/tracks';
+import { CARS, getCarById, DEFAULT_CAR_ID } from './assets/cars';
+import { TRACKS, getTrackById, DEFAULT_TRACK_ID } from './assets/tracks';
 
 type AppState = 'menu' | 'vehicleSelect' | 'trackSelect' | 'loading' | 'racing' | 'paused' | 'results';
 
@@ -42,7 +42,7 @@ class App {
   private session: RaceSession | null = null;
   private resultsShown = false;
 
-  private selectedVehicleId = DEFAULT_VEHICLE_ID;
+  private selectedVehicleId = DEFAULT_CAR_ID;
   private selectedTrackId = DEFAULT_TRACK_ID;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -93,7 +93,7 @@ class App {
       onAI: () =>
         alert(
           "Mode IA : un AIController est fourni (WebSocket vers un serveur Python).\n" +
-            "La partie entraînement (PyTorch / Reinforcement Learning) sera ajoutée dans le dossier ai/.",
+          "La partie entraînement (PyTorch / Reinforcement Learning) sera ajoutée dans le dossier ai/.",
         ),
       onEditor: () => alert('Éditeur de circuits : à venir.'),
     });
@@ -101,7 +101,7 @@ class App {
 
   private goToVehicleSelect(): void {
     this.state = 'vehicleSelect';
-    this.menus.showVehicleSelect(Object.values(VEHICLES), this.selectedVehicleId, {
+    this.menus.showVehicleSelect(CARS, this.selectedVehicleId, {
       onSelect: (id) => (this.selectedVehicleId = id),
       onNext: () => this.goToTrackSelect(),
       onBack: () => this.goToMenu(),
@@ -127,7 +127,7 @@ class App {
     this.menus.setProgress(0.5);
 
     this.disposeSession();
-    const vehicleConfig = VEHICLES[this.selectedVehicleId];
+    const vehicleConfig = getCarById(this.selectedVehicleId);
     const trackDef = getTrackById(this.selectedTrackId);
     const controller = new HumanController(this.input);
 

@@ -4,7 +4,7 @@
  */
 import * as THREE from 'three';
 import { GRAPHICS_CONFIG } from '../config';
-import type { TrackLighting } from '../entities/tracks/types';
+import type { TrackLighting } from '../assets/tracks/types';
 
 export class Lighting {
   private readonly sun: THREE.DirectionalLight;
