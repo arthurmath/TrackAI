@@ -6,7 +6,7 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import { PhysicsWorld } from '../physics/PhysicsWorld';
-import { VehicleController, type VehicleSpawn } from '../physics/VehicleController';
+import { VehicleController, type VehicleSpawn, type WheelTransform } from '../physics/VehicleController';
 import { TrackConstructor, type BuiltTrack } from '../assets/tracks/TrackConstructor';
 import { CarConstructor, type VehicleView } from '../assets/cars/CarConstructor';
 import { AssetLoader } from '../utils/AssetLoader';
@@ -15,7 +15,6 @@ import type { VehicleConfig } from '../assets/cars/types';
 import type { TrackDefinition } from '../assets/tracks/types';
 import type { Controller, VehicleObservation } from '../controllers/Controller';
 import type { Lighting } from '../rendering/Lighting';
-import type { WheelTransform } from '../physics/VehicleController';
 
 const SENSOR_ANGLES = [0, 0.5, -0.5, 1.0, -1.0]; // radians (avant, ±30°, ±60°)
 const SENSOR_MAX = 50;

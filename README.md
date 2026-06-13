@@ -1,144 +1,102 @@
 ## Start project
 
-cd game
-npm install
-npm run dev
+cd game  
+npm install  
+npm run dev  
 
 ---
 
 ## Architecture
 
-Jeu de course 3D web (style Trackmania) construit avec **Vite**, **Three.js** (rendu) et **Rapier.js** (physique). Le point d'entrée `main.ts` orchestre les systèmes persistants ; chaque course est encapsulée dans une `RaceSession` jetable.
+Jeu de course automobile 3D construit pour le web. Le point d'entrée `main.ts` orchestre les systèmes persistants ; chaque course est encapsulée dans une `RaceSession`.
 
 ### Stack
 
-| Couche      | Technologie                                 |
-| ----------- | ------------------------------------------- |
-| Build       | Vite + TypeScript                           |
-| Rendu       | Three.js (WebGL, post-processing optionnel) |
-| Physique    | Rapier 3D (WASM, véhicule raycast)          |
-| UI          | DOM + CSS (`ui/`)                           |
-| Persistance | `localStorage` (meilleurs temps)            |
-| IA (prévu)  | WebSocket → serveur Python (`ai/`)          |
+| Couche      | Technologie                        |
+| ----------- | ---------------------------------- |
+| Build       | Vite + TypeScript                  |
+| Rendu       | Three.js (WebGL)                   |
+| Physique    | Rapier.js (WASM, véhicule raycast) |
+| UI          | DOM + CSS                          |
+| Persistance | `localStorage` (meilleurs temps)   |
+| IA          | Serveur Python (WebSocket)         |
 
 
-### Flux applicatif
 
-```mermaid
-stateDiagram-v2
-    [*] --> menu
-    menu --> vehicleSelect : Jouer
-    vehicleSelect --> trackSelect : Suivant
-    trackSelect --> vehicleSelect : Retour
-    vehicleSelect --> menu : Retour
-    trackSelect --> loading : Démarrer
-    loading --> racing : RaceSession créée
-    racing --> paused : Échap
-    paused --> racing : Reprendre
-    paused --> loading : Recommencer
-    paused --> menu : Menu
-    racing --> results : Course terminée
-    results --> loading : Recommencer
-    results --> menu : Menu
-    menu --> [*]
-```
-
-### Architecture runtime
+### Game architecture 
 
 ```mermaid
 flowchart TB
-    subgraph bootstrap["Bootstrap"]
-        HTML[index.html]
-        MAIN[main.ts / App]
-        INIT[initPhysics]
+    subgraph bootstrap["Root"]
+        MAIN[Main]
+        CONFIG[Config]
     end
 
-    subgraph persistent["Systèmes persistants (durée de vie App)"]
+    subgraph CORE["Core"]
         LOOP[GameLoop]
         INPUT[InputManager]
+        SESSION[RaceSession]
+    end
+
+    subgraph session["Physics"]
+        PW[PhysicsWorld]
+        VC[VehicleController]
+    end
+
+    subgraph RENDERING["Rendering"]
         SCENE[SceneManager]
         CAM[CameraController]
         LIGHT[Lighting]
         POST[PostProcessing]
-        UI[Menus · HUD · Countdown · Debug]
     end
 
-    subgraph session["RaceSession (par course)"]
-        PW[PhysicsWorld]
-        TF[TrackConstructor → BuiltTrack]
-        VC[VehicleController]
-        VV[VehicleView]
-        RACE[Race]
-        CTRL[Controller]
+    subgraph CONT["Controllers"]
+        CONTROLLER["Controller"]
+        HUMAN["HumanController"]
+        AI["AIController"]
     end
 
-    subgraph data["Données"]
-        CARS[cars/data]
-        TRACKS[tracks/data]
-        CFG[config.ts]
-        STORE[Storage / localStorage]
-    end
-
-    HTML --> MAIN
-    MAIN --> INIT
-    MAIN --> persistent
-    MAIN -->|"startRace()"| session
-
-    CARS --> VC
-    CARS --> VV
-    TRACKS --> TF
-    CFG --> LOOP
-    CFG --> RACE
-    STORE --> RACE
-
-    INPUT --> CTRL
-    CTRL -->|ControlState| VC
-    VC --> PW
-    TF --> PW
-    TF --> SCENE
-    VV --> SCENE
-
-    LOOP -->|fixedUpdate dt| session
-    LOOP -->|render alpha| MAIN
-    MAIN --> CAM
-    MAIN --> POST
-    MAIN --> UI
-    RACE --> UI
-```
-
-### Boucle de jeu
-
-La simulation physique tourne à **pas fixe** (60 Hz) ; le rendu suit la fréquence d'affichage avec **interpolation** (`alpha`) entre deux états physiques.
-
-```mermaid
-sequenceDiagram
-    participant GL as GameLoop
-    participant App as main.ts
-    participant RS as RaceSession
-    participant VC as VehicleController
-    participant PW as PhysicsWorld
-    participant R as Race
-    participant Cam as CameraController
-    participant PP as PostProcessing
-
-    loop Chaque frame (rAF)
-        GL->>GL: accumulator += frameDt
-        loop Tant que accumulator ≥ fixedStep
-            GL->>App: fixedUpdate(dt)
-            App->>RS: fixedUpdate(dt, isRacing)
-            RS->>RS: controller.sample()
-            RS->>VC: update(control, dt)
-            RS->>PW: step()
-            RS->>R: update(dt, trackProgress)
-            RS->>RS: buffers interpolation prev/curr
+    subgraph ASSETS["Assets"]
+        subgraph CARS["Cars"]
+            CARCONSTRUCTOR["CarConstructor"]
+            subgraph DATACARS["Data"]
+                CAR1["Car 1"]
+                CAR2["Car 2"]
+            end
         end
-        GL->>App: render(alpha, frameDt)
-        App->>RS: render(alpha)
-        RS->>RS: lerp position / rotation châssis
-        App->>Cam: update(renderPos, speed)
-        App->>PP: render() ou SceneManager.render()
+        subgraph TRACKS["Tracks"]
+            TRACKCONSTRUCTOR["TrackConstructor"]
+            subgraph DATATRACKS["Data"]
+                TRACK1["Track 1"]
+                TRACK2["Track 2"]
+            end
+        end
     end
+
+    MAIN --> CONFIG
+    MAIN -->|"start()"| LOOP
+    MAIN --> INPUT
+    INPUT --> CONT
+
+    LOOP --> SESSION
+
+    SESSION --> CONT
+    SESSION --> ASSETS
+    MAIN --> RENDERING
+
+    CONTROLLER --> HUMAN
+    CONTROLLER --> AI
+
+
+    CARCONSTRUCTOR --> CAR1
+    CARCONSTRUCTOR --> CAR2
+    TRACKCONSTRUCTOR --> TRACK1
+    TRACKCONSTRUCTOR --> TRACK2
+
+    SESSION --> VC
+    PW --> VC
 ```
+
 
 ### Couplage des responsabilités
 
@@ -152,14 +110,12 @@ sequenceDiagram
 | `VehicleController` | Seul module qui parle à Rapier pour le véhicule                                              |
 | `VehicleView`       | Représentation Three.js synchronisée avec la physique                                        |
 
-### Intégration IA (prévue)
+### Intégration IA 
 
 ```mermaid
 flowchart LR
-    RS[RaceSession] -->|VehicleObservation| AIC[AIController]
-    AIC -->|WebSocket JSON| PY[Serveur Python / ai/]
-    PY -->|action throttle steer…| AIC
-    AIC -->|ControlState| VC[VehicleController]
+    PY[Serveur Python] -->|Action| RS[RaceSession]
+    RS -->|GameState| PY
 ```
 
 Chaque frame, `RaceSession` peut pousser une observation (position, capteurs raycast, progression) vers `AIController`, qui relaie les actions reçues du serveur externe.
@@ -211,5 +167,4 @@ Lors de l'import d'un modèle Sketchfab :
 
 ## Questions : 
 
-TrackAI
 Demander quel algorithme de Reinforcement Learning est le plus adapté à ce jeu 

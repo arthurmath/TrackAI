@@ -1,6 +1,6 @@
 /**
  * PhysicsWorld — initialise Rapier (WASM) et encapsule le monde de simulation.
- * Rapier doit être initialisé une seule fois (await RAPIER.init()).
+ * Rapier doit être initialisé une seule fois.
  */
 import RAPIER from '@dimforge/rapier3d-compat';
 import { PHYSICS_CONFIG } from '../config';

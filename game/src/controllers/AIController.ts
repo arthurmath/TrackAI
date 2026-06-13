@@ -1,7 +1,7 @@
 /**
  * AIController — pilotage par un agent externe (réseau de neurones PyTorch).
  *
- * Communication via WebSocket avec un serveur Python (dossier `ai/`, non fourni ici).
+ * Communication via WebSocket avec un serveur Python (dossier `ai/`).
  * Protocole JSON :
  *   - Client (jeu)  -> Serveur (IA) : { type: 'observation', data: VehicleObservation }
  *   - Serveur (IA)  -> Client (jeu) : { type: 'action', data: { throttle, brake, steer, handbrake, reset } }
