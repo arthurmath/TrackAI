@@ -1,0 +1,11 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/ai/.venv/Scripts/python.exe",
+  "python.terminal.activateEnvironment": true,
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/ai"
+  ],
+  "python.analysis.exclude": [
+    "**/.venv/**"
+  ],
+  "python.analysis.typeCheckingMode": "basic"
+}

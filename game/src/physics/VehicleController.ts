@@ -25,6 +25,14 @@ export interface VehicleSpawn {
   quaternion: THREE.Quaternion;
 }
 
+// Groupes de collision (InteractionGroups = membership << 16 | filter).
+// Les voitures entrent en collision avec le décor/piste mais PAS entre elles :
+// en entraînement multi-agents, chaque voiture est un « fantôme » indépendant.
+const GROUP_TRACK = 0x0001;
+const GROUP_CAR = 0x0002;
+/** Groupes des colliders voiture ET des rayons (suspension, capteurs). */
+export const CAR_INTERACTION_GROUP = (GROUP_CAR << 16) | GROUP_TRACK;
+
 export class VehicleController {
   readonly body: RAPIER.RigidBody;
   private readonly vehicle: RAPIER.DynamicRayCastVehicleController;
@@ -58,7 +66,8 @@ export class VehicleController {
     const colliderDesc = RAPIER.ColliderDesc.cuboid(he.x, he.y, he.z)
       .setDensity(0)
       .setFriction(0.6)
-      .setRestitution(0.0);
+      .setRestitution(0.0)
+      .setCollisionGroups(CAR_INTERACTION_GROUP);
     this.collider = world.createCollider(colliderDesc, this.body);
 
     // Masse + inertie d'un pavé + centre de gravité abaissé (anti-tonneau).
@@ -171,7 +180,8 @@ export class VehicleController {
       }
     }
 
-    this.vehicle.updateVehicle(dt);
+    // filterGroups : les rayons de suspension ignorent les autres voitures.
+    this.vehicle.updateVehicle(dt, undefined, CAR_INTERACTION_GROUP);
   }
 
   /** Transform du châssis pour le rendu. */

@@ -145,8 +145,7 @@ Chaque frame, `RaceSession` peut pousser une observation (position, capteurs ray
 - Appui aérodynamique/traînée aérodynamique affectant la maniabilité à grande vitesse.
 - Audio/Musique/Effet sonores
 - Prévoir un cycle jour/nuit 
-- Le circuit est un GLB unique exporté depuis Blender/Sketchfab. Nommer les meshes : `Track_Road`, `Track_Wall`, `Track_Decoration_*`, `Track_Ramp_*`
-- **Contrôle de l'assiette en vol** réglage de l'assiette et du roulis en plein vol, à la manière de Trackmania.
+- **Contrôle de l'assiette en vol** réglage de l'assiette (tangage) et du roulis en plein vol, à la manière de Trackmania.
 - Respawn
 - Détection de voiture retournée pendant > 2s
 - Respawn au début du circuit avec vitesse nulle (animation de fondu)

@@ -1,0 +1,26 @@
+{
+  "scores_history": [
+    {
+      "iteration": 5,
+      "avg_progress": 0.021875,
+      "best_progress": 0.025
+    },
+    {
+      "iteration": 13,
+      "avg_progress": 0.01953125,
+      "best_progress": 0.025
+    }
+  ],
+  "rewards_history": [
+    {
+      "iteration": 5,
+      "avg_reward": -0.012466288251072726,
+      "best_reward": 0.34681239128112795
+    },
+    {
+      "iteration": 13,
+      "avg_reward": -0.021168265651078964,
+      "best_reward": 0.36569441795349117
+    }
+  ]
+}

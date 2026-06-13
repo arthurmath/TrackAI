@@ -14,6 +14,8 @@ import { PostProcessing } from './rendering/PostProcessing';
 import { GameLoop } from './core/GameLoop';
 import { InputManager } from './core/InputManager';
 import { HumanController } from './controllers/HumanController';
+import { AIController } from './controllers/AIController';
+import type { Controller } from './controllers/Controller';
 import { RaceSession } from './core/RaceSession';
 import { Menus } from './ui/Menus';
 import { HUD } from './ui/HUD';
@@ -21,6 +23,7 @@ import { Countdown } from './ui/Countdown';
 import { DebugOverlay } from './ui/DebugOverlay';
 import { CARS, getCarById, DEFAULT_CAR_ID } from './assets/cars';
 import { TRACKS, getTrackById, DEFAULT_TRACK_ID } from './assets/tracks';
+import { AI_CONFIG } from './config';
 
 type AppState = 'menu' | 'vehicleSelect' | 'trackSelect' | 'loading' | 'racing' | 'paused' | 'results';
 
@@ -44,6 +47,8 @@ class App {
 
   private selectedVehicleId = DEFAULT_CAR_ID;
   private selectedTrackId = DEFAULT_TRACK_ID;
+  /** null = pilotage humain ; sinon pilotage par le serveur IA. */
+  private aiMode: 'inference' | 'training' | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.scene = new SceneManager(canvas);
@@ -89,13 +94,27 @@ class App {
     this.hud.hide();
     this.countdown.hide();
     this.menus.showMain({
-      onPlay: () => this.goToVehicleSelect(),
-      onAI: () =>
-        alert(
-          "Mode IA : un AIController est fourni (WebSocket vers un serveur Python).\n" +
-          "La partie entraînement (PyTorch / Reinforcement Learning) sera ajoutée dans le dossier ai/.",
-        ),
+      onPlay: () => {
+        this.aiMode = null;
+        this.goToVehicleSelect();
+      },
+      onAI: () => this.goToAIMenu(),
       onEditor: () => alert('Éditeur de circuits : à venir.'),
+    });
+  }
+
+  private goToAIMenu(): void {
+    this.state = 'menu';
+    this.menus.showAI({
+      onInference: () => {
+        this.aiMode = 'inference';
+        this.goToVehicleSelect();
+      },
+      onTraining: () => {
+        this.aiMode = 'training';
+        this.goToVehicleSelect();
+      },
+      onBack: () => this.goToMenu(),
     });
   }
 
@@ -129,9 +148,22 @@ class App {
     this.disposeSession();
     const vehicleConfig = getCarById(this.selectedVehicleId);
     const trackDef = getTrackById(this.selectedTrackId);
-    const controller = new HumanController(this.input);
 
-    this.session = await RaceSession.create(this.scene.scene, this.lighting, vehicleConfig, trackDef, controller);
+    // Humain / inférence : 1 véhicule. Entraînement : N véhicules en parallèle,
+    // chacun avec sa propre connexion WebSocket vers le serveur Python.
+    let controllers: Controller[];
+    if (this.aiMode === 'training') {
+      const n = Math.max(1, AI_CONFIG.trainingCars);
+      controllers = Array.from({ length: n }, () =>
+        new AIController(AI_CONFIG.websocketUrl, AI_CONFIG.stateSendRate),
+      );
+    } else if (this.aiMode === 'inference') {
+      controllers = [new AIController(AI_CONFIG.websocketUrl, AI_CONFIG.stateSendRate)];
+    } else {
+      controllers = [new HumanController(this.input)];
+    }
+
+    this.session = await RaceSession.create(this.scene.scene, this.lighting, vehicleConfig, trackDef, controllers);
     this.menus.setProgress(1);
 
     await nextFrame();
@@ -183,7 +215,8 @@ class App {
     if (this.state !== 'racing' || !this.session) return;
     const racing = this.session.race.isRacing;
     this.session.fixedUpdate(dt, racing);
-    if (this.session.race.isFinished && !this.resultsShown) {
+    // En entraînement, la session tourne en continu (pas d'écran de résultats).
+    if (this.aiMode !== 'training' && this.session.race.isFinished && !this.resultsShown) {
       this.showResults();
     }
   };

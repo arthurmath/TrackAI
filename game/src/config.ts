@@ -67,6 +67,12 @@ export const AI_CONFIG = {
   websocketUrl: 'ws://localhost:8765',
   /** Fréquence d'envoi de l'état au serveur IA (Hz). */
   stateSendRate: 30,
+  /**
+   * Nombre de voitures entraînées simultanément (mode « Entraînement IA »).
+   * Chacune ouvre sa propre connexion WebSocket ; le serveur Python agrège
+   * leur expérience dans un buffer global partagé. En inférence, une seule.
+   */
+  trainingCars: 20,
 } as const;
 
 /** Clé de stockage localStorage pour les meilleurs temps. */

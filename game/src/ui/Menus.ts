@@ -37,7 +37,7 @@ export class Menus {
       <div class="subtitle">Trackmania-like · Three.js + Rapier</div>
       <div class="menu-col">
         <button class="btn primary" id="m-play">Jouer</button>
-        <button class="btn" id="m-ai">IA — Inférence / Entraînement <span class="tag">bientôt</span></button>
+        <button class="btn" id="m-ai">IA — Inférence / Entraînement</button>
         <button class="btn" id="m-editor">Éditeur de circuits <span class="tag">bientôt</span></button>
       </div>
       <div class="hint">Contrôles : Z/↑ accélérer · S/↓ frein/arrière · Q/D braquer · Espace frein à main · C caméra · R reset · Échap pause · F3 debug</div>
@@ -45,6 +45,23 @@ export class Menus {
     s.querySelector('#m-play')!.addEventListener('click', cb.onPlay);
     s.querySelector('#m-ai')!.addEventListener('click', cb.onAI);
     s.querySelector('#m-editor')!.addEventListener('click', cb.onEditor);
+  }
+
+  // ---------- Sous-menu IA ----------
+  showAI(cb: { onInference: () => void; onTraining: () => void; onBack: () => void }): void {
+    const s = this.screen(`
+      <h2>Mode IA</h2>
+      <div class="subtitle">Pilotage par un agent (serveur Python · WebSocket)</div>
+      <div class="menu-col">
+        <button class="btn primary" id="ai-inference">Inférence IA</button>
+        <button class="btn" id="ai-training">Entraînement IA</button>
+        <button class="btn ghost" id="ai-back">Retour</button>
+      </div>
+      <div class="hint">Lance d'abord le serveur : <code>cd ai · uv run main.py</code> (entraînement) ou <code>TRACKAI_MODE=play uv run main.py</code> (inférence).</div>
+    `);
+    s.querySelector('#ai-inference')!.addEventListener('click', cb.onInference);
+    s.querySelector('#ai-training')!.addEventListener('click', cb.onTraining);
+    s.querySelector('#ai-back')!.addEventListener('click', cb.onBack);
   }
 
   // ---------- Sélection de la voiture ----------
