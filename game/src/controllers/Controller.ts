@@ -42,6 +42,8 @@ export interface Controller {
   sample(): ControlState;
   /** Optionnel : le véhicule pousse son observation (utile pour l'IA). */
   pushObservation?(obs: VehicleObservation): void;
+  /** Demande l'arrêt de l'entraînement côté serveur IA (mode training uniquement). */
+  requestStopTraining?(): void;
   dispose?(): void;
 }
 

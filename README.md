@@ -1,5 +1,8 @@
 ## Start project
 
+cd ai
+uv sync
+cd ..
 cd game  
 npm install  
 npm run dev  
@@ -132,8 +135,7 @@ Chaque frame, `RaceSession` peut pousser une observation (position, capteurs ray
 
 ## Prochaines étapes : 
 
-- Ajouter en mode training AI un bouton arreter entrainement qui enregistre les poids.
-- Ajouter un mode warm start et cold start dans le menu après aovir cliqué sur IA (parce qu'au lancement du script ça charge des poids)
+faire un bouton qui lance automatiquement le server python dans un nouveau terminal
 
 - Track : changements d'altitude, des virages inclinés, un saut/une rampe, et une boucle ou un boost pad si possible.
 - **Plateformes de boost** et **surfaces modifiant la vitesse** (par exemple, zones à faible adhérence / de terre) en option.

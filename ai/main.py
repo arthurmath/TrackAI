@@ -9,20 +9,19 @@ from ppo import Agent
 from utils import (
     RolloutBuffer, extract_state, compute_reward,
     STATE_DIM, ACTION_DIM,
-    load_best, save_weights, save_history,
+    load_best, load_checkpoint_file, list_saved_weights,
+    save_weights, save_history,
 )
 
 # Réduit le bruit des erreurs de handshake websocket.
 logging.getLogger("websockets").setLevel(logging.ERROR)
 
-# Mode : "train" (apprentissage PPO) ou "play" (inférence avec les meilleurs poids).
-MODE = os.environ.get("TRACKAI_MODE", "train")
 PORT = int(os.environ.get("TRACKAI_PORT", "8765"))
 
 # Entraîne dès que le buffer global atteint ce nombre de pas.
 UPDATE_TIMESTEP = 2048
-# Sauvegarde automatique des poids toutes les N mises à jour.
-SAVE_EVERY = 10
+# Sauvegarde automatique des poids toutes les N entrainements PPO.
+SAVE_EVERY = 100
 # Coupe un épisode si la voiture reste quasi immobile trop longtemps (anti-blocage).
 STUCK_LIMIT = 150        # pas
 STUCK_SPEED = 1.0        # m/s
@@ -45,7 +44,7 @@ agent = Agent(
     action_std_init=0.6,
 )
 
-# État global partagé entre toutes les connexions (plusieurs voitures IA possibles).
+# État global partagé entre toutes les connexions d'entraînement.
 global_buffer = RolloutBuffer()
 global_timestep_count = 0
 train_count = 0
@@ -56,6 +55,12 @@ history_lock = asyncio.Lock()
 scores_history = []      # progression max par épisode
 rewards_history = []     # récompense moyenne par entraînement
 episode_progress = []    # progressions des épisodes depuis le dernier entraînement
+stop_requested = False
+stop_save_lock = asyncio.Lock()
+active_connections = 0
+connection_lock = asyncio.Lock()
+training_init_applied = False
+training_init_lock = asyncio.Lock()
 
 
 def action_to_control(action, reset=False):
@@ -77,6 +82,74 @@ def action_to_control(action, reset=False):
 
 async def send_action(websocket, control):
     await websocket.send(json.dumps({"type": "action", "data": control}))
+
+
+async def reset_training_counters():
+    """Remet à zéro les compteurs d'une nouvelle session d'entraînement."""
+    global train_count, global_timestep_count, iteration_count
+    global session_best_progress, stop_requested
+    global scores_history, rewards_history, episode_progress
+
+    async with history_lock:
+        train_count = 0
+        global_timestep_count = 0
+        iteration_count = 0
+        session_best_progress = 0.0
+        scores_history = []
+        rewards_history = []
+        episode_progress = []
+        global_buffer.clear()
+    async with stop_save_lock:
+        stop_requested = False
+
+
+async def apply_training_init(data):
+    """Applique cold start ou warm start (une seule fois par session)."""
+    global training_init_applied
+
+    async with training_init_lock:
+        if training_init_applied:
+            return
+        training_init_applied = True
+
+    await reset_training_counters()
+
+    mode = data.get("mode")
+    if mode == "cold":
+        agent.reinitialize()
+        print("Training init: cold start.")
+    elif mode == "warm":
+        filename = data.get("weightsFile", "")
+        if not load_checkpoint_file(filename, agent.policy, agent.policy_old, agent.optimizer):
+            print(f"Warm start failed for {filename!r}, falling back to cold start.")
+            agent.reinitialize()
+        else:
+            print(f"Training init: warm start from {filename}.")
+    else:
+        print(f"Unknown training init mode {mode!r}, using cold start.")
+        agent.reinitialize()
+
+
+async def apply_play_init(data):
+    """Charge les poids choisis par le client (mode inférence / AI Player)."""
+    filename = data.get("weightsFile", "")
+    if not load_checkpoint_file(filename, agent.policy, agent.policy_old):
+        print(f"Play init failed for {filename!r}, falling back to best weights.")
+        load_best(agent.policy, agent.policy_old)
+    else:
+        print(f"Inference mode. Initialized with weights {filename}.")
+
+
+async def handle_stop_training():
+    """Arrête l'entraînement et enregistre poids + historique (une seule fois)."""
+    global stop_requested
+    async with stop_save_lock:
+        if stop_requested:
+            return
+        stop_requested = True
+        print("\nStop training requested. Saving weights and history.")
+        save_weights(agent.policy, agent.optimizer, int(session_best_progress * 1000))
+        save_history(scores_history, rewards_history)
 
 
 async def perform_training():
@@ -134,8 +207,15 @@ async def end_episode(local_buffer, max_progress):
         await perform_training()
 
 
-async def play_game(websocket):
-    """Une connexion = une voiture IA. Non bloquant : répond à chaque observation."""
+async def start(websocket):
+    """Une connexion = une voiture IA. Mode play ou train selon le message d'init."""
+    global active_connections, stop_requested, training_init_applied
+
+    conn_mode = None  # "play" | "train"
+
+    async with connection_lock:
+        active_connections += 1
+
     local_buffer = RolloutBuffer()
     prev_progress = None
     max_progress = 0.0
@@ -144,6 +224,27 @@ async def play_game(websocket):
     try:
         async for message in websocket:
             msg = json.loads(message)
+            if msg.get("type") == "stop_training":
+                if conn_mode == "train":
+                    await handle_stop_training()
+                continue
+            if msg.get("type") == "training_init":
+                await apply_training_init(msg.get("data", {}))
+                conn_mode = "train"
+                continue
+            if msg.get("type") == "play_init":
+                await apply_play_init(msg.get("data", {}))
+                conn_mode = "play"
+                continue
+            if conn_mode is None:
+                if training_init_applied:
+                    conn_mode = "train"
+                else:
+                    continue
+            if conn_mode == "train" and stop_requested:
+                continue
+            if conn_mode == "train" and not training_init_applied:
+                continue
             if msg.get("type") != "observation":
                 continue
             obs = msg.get("data", {})
@@ -153,15 +254,14 @@ async def play_game(websocket):
 
             max_progress = max(max_progress, progress)
 
-            # --- Mode inférence : action déterministe, pas d'apprentissage -----
-            if MODE != "train":
+            # --- Mode inférence (AI Player) ------------------------------------
+            if conn_mode == "play":
                 state = extract_state(obs)
                 action, _ = agent.act_play(state)
                 await send_action(websocket, action_to_control(action))
                 continue
 
             # --- Mode entraînement ---------------------------------------------
-            # 1) Récompense de la transition due à l'action précédente.
             if len(local_buffer.states) > len(local_buffer.rewards):
                 reward, _ = compute_reward(prev_progress, obs)
 
@@ -177,7 +277,6 @@ async def play_game(websocket):
                 local_buffer.is_terminals.append(done)
 
                 if done:
-                    # Fin d'épisode : on demande un respawn et on remet à zéro.
                     await send_action(websocket, action_to_control([0.0, 0.0], reset=True))
                     await end_episode(local_buffer, max_progress)
                     prev_progress = None
@@ -185,7 +284,6 @@ async def play_game(websocket):
                     stuck_steps = 0
                     continue
 
-            # 2) Nouvelle action à partir de l'état courant.
             state = extract_state(obs)
             action = agent.act_train(state, local_buffer)
             prev_progress = progress
@@ -194,8 +292,12 @@ async def play_game(websocket):
     except websockets.exceptions.ConnectionClosed:
         pass
     finally:
-        if MODE == "train":
-            # Réaligne states/rewards si déconnexion avant d'avoir noté la récompense.
+        async with connection_lock:
+            active_connections -= 1
+            if active_connections == 0:
+                async with training_init_lock:
+                    training_init_applied = False
+        if conn_mode == "train":
             if len(local_buffer.states) > len(local_buffer.rewards):
                 local_buffer.states.pop()
                 local_buffer.actions.pop()
@@ -205,17 +307,24 @@ async def play_game(websocket):
                 await end_episode(local_buffer, max_progress)
 
 
+async def process_request(connection, request):
+    """Expose la liste des poids via HTTP GET /weights (même port que le WebSocket)."""
+    if request.path != "/weights":
+        return None
+    response = connection.respond(200, json.dumps(list_saved_weights()))
+    response.headers["Content-Type"] = "application/json"
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    return response
+
+
 async def main():
-    print(f"Starting TrackAI server on ws://127.0.0.1:{PORT}  (mode={MODE})")
-    if MODE != "train":
-        load_best(agent.policy, agent.policy_old)
-    else:
-        # Warm start si des poids existent déjà (reprise d'entraînement).
-        load_best(agent.policy, agent.policy_old, agent.optimizer)
+    print(f"\nStarting Websocket server on ws://127.0.0.1:{PORT}\n")
 
     stop = asyncio.Future()
     try:
-        async with websockets.serve(play_game, "127.0.0.1", PORT):
+        async with websockets.serve(
+            start, "127.0.0.1", PORT, process_request=process_request,
+        ):
             await stop
     except websockets.exceptions.ConnectionClosed:
         pass
@@ -225,7 +334,7 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        if MODE == "train":
+        if training_init_applied and (scores_history or rewards_history):
             print("\nServer stopping. Saving weights and history.")
             save_weights(agent.policy, agent.optimizer, int(session_best_progress * 1000))
             save_history(scores_history, rewards_history)

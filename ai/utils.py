@@ -159,6 +159,46 @@ def _load_checkpoint(path, policy, policy_old, optimizer=None):
     policy_old.load_state_dict(policy_state)
 
 
+def list_saved_weights():
+    """Liste tous les checkpoints disponibles (plus récents en premier)."""
+    files = glob.glob(os.path.join(weights_dir, "score_*.pth"))
+    entries = []
+    for path in files:
+        basename = os.path.basename(path)
+        score = 0
+        timestamp = ""
+        try:
+            stem = basename.removesuffix(".pth")
+            parts = stem.split("_")
+            score = int(parts[1])
+            if len(parts) >= 4:
+                timestamp = f"{parts[2]}_{parts[3]}"
+        except (IndexError, ValueError):
+            pass
+        entries.append({
+            "filename": basename,
+            "score": score,
+            "timestamp": timestamp,
+            "mtime": os.path.getmtime(path),
+        })
+    entries.sort(key=lambda e: e["mtime"], reverse=True)
+    for e in entries:
+        del e["mtime"]
+    return entries
+
+
+def load_checkpoint_file(path, policy, policy_old, optimizer=None):
+    """Charge un checkpoint par chemin absolu ou relatif au dossier weights."""
+    if not os.path.isabs(path):
+        path = os.path.join(weights_dir, os.path.basename(path))
+    if not os.path.isfile(path):
+        print(f"Checkpoint not found: {path}")
+        return False
+    # print(f"Loading weights: {path}")
+    _load_checkpoint(path, policy, policy_old, optimizer)
+    return True
+
+
 def load_best(policy, policy_old, optimizer=None):
     files = glob.glob(os.path.join(weights_dir, "score_*.pth"))
     if not files:

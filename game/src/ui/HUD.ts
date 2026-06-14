@@ -20,6 +20,7 @@ export class HUD {
   private readonly speedValueEl: HTMLElement;
   private readonly arcFg: SVGPathElement;
   private readonly arcLength: number;
+  private trainingBar: HTMLElement | null = null;
 
   constructor(parent: HTMLElement) {
     this.root = document.createElement('div');
@@ -74,6 +75,22 @@ export class HUD {
   }
   hide(): void {
     this.root.classList.add('hidden');
+    this.hideTrainingControls();
+  }
+
+  showTrainingControls(onStop: () => void): void {
+    this.hideTrainingControls();
+    this.trainingBar = document.createElement('div');
+    this.trainingBar.className = 'hud-training';
+    this.trainingBar.innerHTML =
+      '<button class="btn" id="hud-stop-training">Stop training</button>';
+    this.trainingBar.querySelector('#hud-stop-training')!.addEventListener('click', onStop);
+    this.root.appendChild(this.trainingBar);
+  }
+
+  hideTrainingControls(): void {
+    this.trainingBar?.remove();
+    this.trainingBar = null;
   }
 
   update(snap: RaceSnapshot, speedKmh: number): void {

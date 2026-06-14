@@ -12,6 +12,14 @@
 import { NEUTRAL_CONTROL } from './Controller';
 import type { Controller, ControlState, VehicleObservation } from './Controller';
 
+export type AIInit =
+  | { kind: 'training'; mode: 'cold' }
+  | { kind: 'training'; mode: 'warm'; weightsFile: string }
+  | { kind: 'play'; weightsFile: string };
+
+/** @deprecated Use AIInit */
+export type TrainingInit = Extract<AIInit, { kind: 'training' }>;
+
 export class AIController implements Controller {
   readonly kind = 'ai' as const;
 
@@ -23,6 +31,8 @@ export class AIController implements Controller {
   constructor(
     private readonly url: string,
     private readonly stateSendRate: number,
+    private readonly init?: AIInit,
+    private readonly sendInit = false,
   ) {
     this.connect();
   }
@@ -37,6 +47,21 @@ export class AIController implements Controller {
     this.socket.addEventListener('open', () => {
       this.connected = true;
       console.info('[AIController] Connecté au serveur IA:', this.url);
+      if (this.sendInit && this.init) {
+        if (this.init.kind === 'training') {
+          this.socket!.send(JSON.stringify({
+            type: 'training_init',
+            data: this.init.mode === 'warm'
+              ? { mode: 'warm', weightsFile: this.init.weightsFile }
+              : { mode: 'cold' },
+          }));
+        } else {
+          this.socket!.send(JSON.stringify({
+            type: 'play_init',
+            data: { weightsFile: this.init.weightsFile },
+          }));
+        }
+      }
     });
     this.socket.addEventListener('close', () => {
       this.connected = false;
@@ -82,6 +107,12 @@ export class AIController implements Controller {
     const action = { ...this.latestAction };
     this.latestAction.reset = false;
     return action;
+  }
+
+  requestStopTraining(): void {
+    if (this.socket?.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify({ type: 'stop_training' }));
+    }
   }
 
   dispose(): void {

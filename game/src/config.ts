@@ -65,6 +65,10 @@ export const RACE_CONFIG = {
 export const AI_CONFIG = {
   /** URL du serveur WebSocket Python pilotant l'AIController. */
   websocketUrl: 'ws://localhost:8765',
+  /** URL HTTP pour lister les checkpoints de poids sauvegardés. */
+  weightsApiUrl: 'http://localhost:8765/weights',
+  /** URL pour démarrer le serveur Python (plugin Vite, dev uniquement). */
+  serverStartUrl: '/api/ai-server/start',
   /** Fréquence d'envoi de l'état au serveur IA (Hz). */
   stateSendRate: 30,
   /**
@@ -77,5 +81,5 @@ export const AI_CONFIG = {
 
 /** Clé de stockage localStorage pour les meilleurs temps. */
 export const STORAGE_KEYS = {
-  bestTimes: 'raceai.bestTimes.v1',
+  bestTimes: 'trackai.bestTimes.v1',
 } as const;

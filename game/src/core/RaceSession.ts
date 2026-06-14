@@ -251,6 +251,13 @@ export class RaceSession {
     return out;
   }
 
+  requestStopTraining(): void {
+    for (const agent of this.agents) {
+      agent.controller.requestStopTraining?.();
+      break;
+    }
+  }
+
   dispose(scene: THREE.Scene): void {
     for (const agent of this.agents) {
       scene.remove(agent.view.group);

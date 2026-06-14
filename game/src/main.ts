@@ -14,7 +14,7 @@ import { PostProcessing } from './rendering/PostProcessing';
 import { GameLoop } from './core/GameLoop';
 import { InputManager } from './core/InputManager';
 import { HumanController } from './controllers/HumanController';
-import { AIController } from './controllers/AIController';
+import { AIController, type AIInit } from './controllers/AIController';
 import type { Controller } from './controllers/Controller';
 import { RaceSession } from './core/RaceSession';
 import { Menus } from './ui/Menus';
@@ -24,6 +24,7 @@ import { DebugOverlay } from './ui/DebugOverlay';
 import { CARS, getCarById, DEFAULT_CAR_ID } from './assets/cars';
 import { TRACKS, getTrackById, DEFAULT_TRACK_ID } from './assets/tracks';
 import { AI_CONFIG } from './config';
+import { AiServer } from './utils/AiServer';
 
 type AppState = 'menu' | 'vehicleSelect' | 'trackSelect' | 'loading' | 'racing' | 'paused' | 'results';
 
@@ -49,6 +50,7 @@ class App {
   private selectedTrackId = DEFAULT_TRACK_ID;
   /** null = pilotage humain ; sinon pilotage par le serveur IA. */
   private aiMode: 'inference' | 'training' | null = null;
+  private aiInit: AIInit | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.scene = new SceneManager(canvas);
@@ -96,6 +98,7 @@ class App {
     this.menus.showMain({
       onPlay: () => {
         this.aiMode = null;
+        this.aiInit = null;
         this.goToVehicleSelect();
       },
       onAI: () => this.goToAIMenu(),
@@ -103,15 +106,29 @@ class App {
     });
   }
 
-  private goToAIMenu(): void {
+  private async goToAIMenu(): Promise<void> {
     this.state = 'menu';
-    this.menus.showAI({
-      onInference: () => {
+    const serverRunning = await AiServer.isRunning();
+    const weights = await Menus.fetchSavedWeights();
+    this.menus.showAI(weights, serverRunning, {
+      onStartServer: async () => {
+        const ok = await AiServer.start();
+        if (ok) await this.goToAIMenu();
+        return ok;
+      },
+      onPlayStart: (filename) => {
         this.aiMode = 'inference';
+        this.aiInit = { kind: 'play', weightsFile: filename };
         this.goToVehicleSelect();
       },
-      onTraining: () => {
+      onColdStart: () => {
         this.aiMode = 'training';
+        this.aiInit = { kind: 'training', mode: 'cold' };
+        this.goToVehicleSelect();
+      },
+      onWarmStart: (filename) => {
+        this.aiMode = 'training';
+        this.aiInit = { kind: 'training', mode: 'warm', weightsFile: filename };
         this.goToVehicleSelect();
       },
       onBack: () => this.goToMenu(),
@@ -123,7 +140,10 @@ class App {
     this.menus.showVehicleSelect(CARS, this.selectedVehicleId, {
       onSelect: (id) => (this.selectedVehicleId = id),
       onNext: () => this.goToTrackSelect(),
-      onBack: () => this.goToMenu(),
+      onBack: () => {
+        if (this.aiMode != null) void this.goToAIMenu();
+        else this.goToMenu();
+      },
     });
   }
 
@@ -153,12 +173,14 @@ class App {
     // chacun avec sa propre connexion WebSocket vers le serveur Python.
     let controllers: Controller[];
     if (this.aiMode === 'training') {
+      const init = this.aiInit ?? { kind: 'training' as const, mode: 'cold' as const };
       const n = Math.max(1, AI_CONFIG.trainingCars);
-      controllers = Array.from({ length: n }, () =>
-        new AIController(AI_CONFIG.websocketUrl, AI_CONFIG.stateSendRate),
+      controllers = Array.from({ length: n }, (_, i) =>
+        new AIController(AI_CONFIG.websocketUrl, AI_CONFIG.stateSendRate, init, i === 0),
       );
     } else if (this.aiMode === 'inference') {
-      controllers = [new AIController(AI_CONFIG.websocketUrl, AI_CONFIG.stateSendRate)];
+      const init = this.aiInit ?? { kind: 'play' as const, weightsFile: '' };
+      controllers = [new AIController(AI_CONFIG.websocketUrl, AI_CONFIG.stateSendRate, init, true)];
     } else {
       controllers = [new HumanController(this.input)];
     }
@@ -171,8 +193,22 @@ class App {
     this.resultsShown = false;
     this.menus.hide();
     this.hud.show();
+    if (this.aiMode === 'training') {
+      this.hud.showTrainingControls(() => this.stopTraining());
+    }
     this.input.setEnabled(true);
     this.state = 'racing';
+  }
+
+  private stopTraining(): void {
+    if (this.aiMode !== 'training') return;
+    this.session?.requestStopTraining();
+    this.disposeSession();
+    this.state = 'menu';
+    this.input.setEnabled(false);
+    this.hud.hide();
+    this.countdown.hide();
+    void this.goToAIMenu();
   }
 
   private showResults(): void {

@@ -72,6 +72,12 @@ class Agent:
         self.c2 = c2
         self.gae_lambda = gae_lambda
         self.batch_size = batch_size
+        self._state_dim = state_dim
+        self._action_dim = action_dim
+        self._layers = layers
+        self._action_std_init = action_std_init
+        self._lr_actor = lr_actor
+        self._lr_critic = lr_critic
 
         self.policy = ActorCritic(state_dim, action_dim, layers, action_std_init).to(device)
         self.policy_old = ActorCritic(state_dim, action_dim, layers, action_std_init).to(device)
@@ -86,6 +92,22 @@ class Agent:
 
         # Évite que des mises à jour simultanées (plusieurs agents) ne se chevauchent.
         self.update_lock = asyncio.Lock()
+
+    def reinitialize(self):
+        """Réinitialise aléatoirement les poids et l'optimiseur (cold start)."""
+        self.policy = ActorCritic(
+            self._state_dim, self._action_dim, self._layers, self._action_std_init,
+        ).to(device)
+        self.policy_old = ActorCritic(
+            self._state_dim, self._action_dim, self._layers, self._action_std_init,
+        ).to(device)
+        self.policy_old.load_state_dict(self.policy.state_dict())
+        self.optimizer = torch.optim.Adam([
+            {"params": self.policy.actor.parameters(), "lr": self._lr_actor},
+            {"params": self.policy.critic.parameters(), "lr": self._lr_critic},
+            {"params": [self.policy.log_std], "lr": self._lr_actor},
+        ])
+        print("Cold start: neural network weights reinitialized.")
 
     def act_play(self, state): 
         """Action déterministe (moyenne) pour l'inférence/démo."""

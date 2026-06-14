@@ -4,8 +4,19 @@
   "python.analysis.extraPaths": [
     "${workspaceFolder}/ai"
   ],
+  "python.analysis.venvPath": "${workspaceFolder}/ai",
+  "python.analysis.venv": ".venv",
   "python.analysis.exclude": [
     "**/.venv/**"
   ],
-  "python.analysis.typeCheckingMode": "basic"
+  "python.analysis.typeCheckingMode": "basic",
+  "cursorpyright.analysis.exclude": [
+    "**/.venv/**"
+  ],
+  "cursorpyright.analysis.extraPaths": [
+    "${workspaceFolder}/ai"
+  ],
+  "cursorpyright.analysis.venvPath": "${workspaceFolder}/ai",
+  "cursorpyright.analysis.venv": ".venv",
+  "cursorpyright.analysis.typeCheckingMode": "basic"
 }
