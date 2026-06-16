@@ -8,10 +8,10 @@ import { formatTime, formatDelta } from '../utils/helpers';
 const SPEEDO_MAX_KMH = 320;
 const ARC_RADIUS = 80;
 const ARC_CENTER_X = 110;
-const ARC_CENTER_Y = 108;
+const ARC_CENTER_Y = 62;
 const SVG_WIDTH = 220;
-const SVG_HEIGHT = 210;
-const SVG_VIEWBOX_Y = -12;
+const SVG_HEIGHT = 148;
+const SVG_VIEWBOX_Y = -6;
 // Arc 270° : symétrie miroir (0 en bas-gauche, sens horaire) puis rotation +90°.
 const ARC_ZERO_ANGLE = 315; // position 0 km/h (haut-gauche après rotation)
 const ARC_SWEEP = 270;

@@ -26,7 +26,10 @@ SAVE_EVERY = 100
 # 30 Hz d'observations × 4 s = 120 pas (aligné sur AI_CONFIG.trainingStuckSeconds).
 STUCK_LIMIT = 120        # pas
 STUCK_SPEED = 1.0        # m/s
-TERMINAL_PENALTY = 10.0
+# Pénalité de fin d'épisode volontairement faible : une grosse pénalité rend la
+# voiture craintive et l'incite à rester immobile (rester bloqué devient "plus
+# sûr" que de tenter d'avancer). L'immobilité est déjà punie par compute_reward.
+TERMINAL_PENALTY = 2.0
 
 
 agent = Agent(

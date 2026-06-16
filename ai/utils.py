@@ -109,22 +109,30 @@ def extract_state(obs):
 
 
 
+# Vitesse en dessous de laquelle la voiture est considérée immobile (m/s).
+IDLE_SPEED = 1.0
+# Pénalité par pas quand la voiture est quasi immobile (incite à démarrer).
+IDLE_PENALTY = 0.5
+# Récompense dense par m/s d'avance : signal local fort pour sortir du départ.
+SPEED_REWARD = 0.1
+# Petit coût de temps constant.
+TIME_PENALTY = 0.02
+# Pénalité par pas hors-piste (modérée : rester bloqué ne doit jamais être
+# "plus sûr" que d'avancer).
+OFFTRACK_PENALTY = 0.5
+
+
 def compute_reward(prev_progress, obs):
     """Récompense d'une transition. Retourne (reward, delta_progress).
 
-    - Avancement sur le circuit (principal moteur d'apprentissage).
-    - Pénalité de temps + forte pénalité d'immobilité (incite à bouger).
-    - Petit bonus de vitesse.
-    - Pénalité hors-piste.
+    Conçue pour faire DÉMARRER les voitures :
+    - Forte récompense dense de vitesse vers l'avant (gradient immédiat dès qu'on
+      met les gaz, avant même tout gain de progression).
+    - Avancement sur le circuit (donne la bonne direction).
+    - Pénalité d'immobilité + petit coût de temps.
+    - Pénalité hors-piste modérée.
     Gère le bouclage de la progression (fin de tour : 1.0 -> 0.0).
     """
-    # Vitesse en dessous de laquelle la voiture est considérée immobile (m/s).
-    IDLE_SPEED = 1.0
-    # Pénalité par pas quand la voiture est quasi immobile (incite à démarrer).
-    IDLE_PENALTY = 1.0
-    # Pénalité de temps appliquée à chaque pas (rester sur place coûte cher).
-    TIME_PENALTY = 0.05
-
     progress = float(obs.get("trackProgress", 0.0))
     delta = progress - prev_progress
     if delta < -0.5:      # bouclage de tour
@@ -135,14 +143,14 @@ def compute_reward(prev_progress, obs):
     forward_speed = float(obs.get("forwardSpeed", 0.0))
 
     reward = delta * 100.0
-    reward += forward_speed * 0.01
-    # Coût de temps constant : ne rien faire n'est jamais neutre.
+    # Récompense (ou pénalité en marche arrière) proportionnelle à la vitesse.
+    reward += forward_speed * SPEED_REWARD
     reward -= TIME_PENALTY
     # Pénalité supplémentaire tant que la voiture reste quasi immobile.
     if abs(forward_speed) < IDLE_SPEED:
         reward -= IDLE_PENALTY
     if obs.get("offTrack", False):
-        reward -= 1.0
+        reward -= OFFTRACK_PENALTY
     return reward, delta
 
 

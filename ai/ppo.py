@@ -107,7 +107,7 @@ class Agent:
             {"params": self.policy.critic.parameters(), "lr": self._lr_critic},
             {"params": [self.policy.log_std], "lr": self._lr_actor},
         ])
-        print("Cold start: neural network weights reinitialized.")
+        print("\n\nCold start: neural network weights reinitialized.")
 
     def act_play(self, state): 
         """Action déterministe (moyenne) pour l'inférence/démo."""

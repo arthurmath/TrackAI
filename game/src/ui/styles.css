@@ -39,7 +39,7 @@ body {
   z-index: 10;
 }
 
-#ui-root > * {
+#ui-root>* {
   pointer-events: auto;
 }
 
@@ -598,10 +598,12 @@ body {
     transform: scale(2.4);
     opacity: 0;
   }
+
   30% {
     transform: scale(1);
     opacity: 1;
   }
+
   100% {
     transform: scale(0.7);
     opacity: 0;
@@ -658,6 +660,7 @@ body {
 .delta.good {
   color: var(--good);
 }
+
 .delta.bad {
   color: var(--bad);
 }
@@ -672,19 +675,24 @@ body {
 .speedo-wrap {
   position: relative;
   width: 220px;
-  height: 210px;
+  height: 132px;
 }
 
 .hud-speed svg {
+  position: absolute;
+  left: 0;
+  bottom: -100px;
   display: block;
   overflow: visible;
+  pointer-events: none;
 }
 
 .speedo-readout {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 18px;
+  bottom: 44px;
+  z-index: 1;
   text-align: center;
   pointer-events: none;
 }
@@ -725,10 +733,12 @@ body {
   font-size: 16px;
   margin: 6px 0 12px;
 }
+
 .results-table td {
   padding: 4px 18px;
   color: var(--muted);
 }
+
 .results-table td.val {
   color: var(--text);
   font-weight: 600;
