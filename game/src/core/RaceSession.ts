@@ -45,6 +45,9 @@ export class RaceSession {
 
   private readonly lighting: Lighting;
   private readonly agents: SessionAgent[];
+  /** En entraînement IA : la caméra suit la voiture la plus avancée sur le circuit. */
+  private readonly cameraFollowLeader: boolean;
+  private leaderIndex = 0;
 
   // Buffers réutilisés (observation/capteurs) pour éviter les allocations par frame.
   private readonly _vel = new THREE.Vector3();
@@ -62,6 +65,7 @@ export class RaceSession {
     vehicleConfig: VehicleConfig,
     trackDef: TrackDefinition,
     controllers: Controller[],
+    options?: { cameraFollowLeader?: boolean },
   ): Promise<RaceSession> {
     const physics = new PhysicsWorld(trackDef.gravity);
     const assetLoader = new AssetLoader();
@@ -70,7 +74,10 @@ export class RaceSession {
     const track = await trackFactory.build(trackDef);
     // Une vue par véhicule (le circuit n'est construit qu'une fois).
     const views = await Promise.all(controllers.map(() => carFactory.build(vehicleConfig)));
-    return new RaceSession(scene, lighting, vehicleConfig, trackDef, controllers, physics, track, views);
+    return new RaceSession(
+      scene, lighting, vehicleConfig, trackDef, controllers, physics, track, views,
+      options?.cameraFollowLeader ?? false,
+    );
   }
 
   private constructor(
@@ -82,12 +89,14 @@ export class RaceSession {
     physics: PhysicsWorld,
     track: BuiltTrack,
     views: VehicleView[],
+    cameraFollowLeader: boolean,
   ) {
     this.physics = physics;
     this.track = track;
     this.vehicleConfig = vehicleConfig;
     this.trackDef = trackDef;
     this.lighting = lighting;
+    this.cameraFollowLeader = cameraFollowLeader;
 
     const spawn: VehicleSpawn = this.track.spawn;
     this.agents = controllers.map((controller, i) => {
@@ -114,14 +123,19 @@ export class RaceSession {
       return agent;
     });
 
-    // Recorder/HUD/caméra suivent l'agent principal (index 0).
+    // Recorder/HUD suivent l'agent principal (index 0) ; la caméra peut suivre le leader.
     this.race = new Recorder(trackDef.id, vehicleConfig.id);
     this.lighting.apply(trackDef.lighting);
   }
 
-  /** Agent principal : suivi par la caméra, le HUD et le recorder. */
+  /** Agent principal : suivi par le HUD et le recorder. */
   private get primary(): SessionAgent {
     return this.agents[0];
+  }
+
+  /** Agent suivi par la caméra et l'éclairage dynamique. */
+  private get cameraAgent(): SessionAgent {
+    return this.cameraFollowLeader ? this.agents[this.leaderIndex] : this.primary;
   }
 
   /** Pas fixe de simulation. allowControl=false pendant le compte à rebours. */
@@ -146,6 +160,8 @@ export class RaceSession {
     this.physics.step();
 
     // 3) Mise à jour par agent : buffers, progression, respawn auto, observation.
+    let bestProgress = -1;
+    let bestLeaderIndex = this.leaderIndex;
     for (let i = 0; i < this.agents.length; i++) {
       const agent = this.agents[i];
 
@@ -154,6 +170,11 @@ export class RaceSession {
       agent.vehicle.getChassisTransform(agent.currPos, agent.currQuat);
 
       const progress = this.track.getProgress(agent.currPos);
+
+      if (this.cameraFollowLeader && progress > bestProgress) {
+        bestProgress = progress;
+        bestLeaderIndex = i;
+      }
 
       // Le recorder ne suit que l'agent principal.
       if (i === 0) {
@@ -177,6 +198,9 @@ export class RaceSession {
         agent.controller.pushObservation(this.buildObservation(agent, progress));
       }
     }
+    if (this.cameraFollowLeader) {
+      this.leaderIndex = bestLeaderIndex;
+    }
   }
 
   /** Rendu interpolé entre deux pas physiques (tous les véhicules). */
@@ -187,10 +211,10 @@ export class RaceSession {
       agent.vehicle.getWheelTransforms(agent.wheelTransforms);
       agent.view.update(agent.renderPos, agent.renderQuat, agent.wheelTransforms);
     }
-    this.lighting.followTarget(this.primary.renderPos);
+    this.lighting.followTarget(this.cameraAgent.renderPos);
   }
 
-  /** Véhicule principal (compat : caméra, debug). */
+  /** Véhicule principal (compat : debug). */
   get vehicle(): VehicleController {
     return this.primary.vehicle;
   }
@@ -198,16 +222,16 @@ export class RaceSession {
     return this.primary.view;
   }
   get renderPosition(): THREE.Vector3 {
-    return this.primary.renderPos;
+    return this.cameraAgent.renderPos;
   }
   get renderRotation(): THREE.Quaternion {
-    return this.primary.renderQuat;
+    return this.cameraAgent.renderQuat;
   }
   get speedKmh(): number {
-    return this.primary.vehicle.speedKmh;
+    return this.cameraAgent.vehicle.speedKmh;
   }
   get speed01(): number {
-    return Math.min(1, this.primary.vehicle.speedKmh / 320);
+    return Math.min(1, this.cameraAgent.vehicle.speedKmh / 320);
   }
 
   private buildObservation(agent: SessionAgent, progress: number): VehicleObservation {

@@ -39,7 +39,7 @@ export const track_2: TrackDefinition = {
   accentColor: 0x6c5ce7,
   centerline: CENTERLINE,
   roadWidth: 12,
-  barrierHeight: 1.2,
+  barrierHeight: 0.95,
   segments: 340,
   roadFriction: 0.95,
   gravity: { x: 0, y: -9.81, z: 0 },

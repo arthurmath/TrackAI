@@ -664,10 +664,29 @@ body {
 
 .hud-speed {
   position: absolute;
-  right: 30px;
-  bottom: 26px;
-  text-align: center;
+  right: 24px;
+  bottom: 0;
   width: 220px;
+}
+
+.speedo-wrap {
+  position: relative;
+  width: 220px;
+  height: 210px;
+}
+
+.hud-speed svg {
+  display: block;
+  overflow: visible;
+}
+
+.speedo-readout {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 18px;
+  text-align: center;
+  pointer-events: none;
 }
 
 .speed-value {
@@ -677,6 +696,7 @@ body {
 }
 
 .speed-unit {
+  margin-top: 2px;
   font-size: 16px;
   color: var(--muted);
   letter-spacing: 2px;

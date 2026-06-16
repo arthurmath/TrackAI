@@ -54,7 +54,7 @@ export const track_3: TrackDefinition = {
 
   centerline: CENTERLINE,
   roadWidth: 11,
-  barrierHeight: 1.4,
+  barrierHeight: 1.1,
   segments: 360,
 
   roadFriction: 1.05,

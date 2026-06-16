@@ -28,6 +28,139 @@ export interface BuiltTrack {
 
 const UP = new THREE.Vector3(0, 1, 0);
 
+/** Angle minimal (rad) entre segments de bord avant d'appliquer un chanfrein. */
+const BEVEL_ANGLE_MIN = 0.02;
+
+/** Angle au-delà duquel un sommet de bord est lissé (évite les pics résiduels). */
+const SPIKE_ANGLE_MAX = (85 * Math.PI) / 180;
+
+function horizontalDir(from: THREE.Vector3, to: THREE.Vector3, out: THREE.Vector3): number {
+  out.subVectors(to, from);
+  out.y = 0;
+  const len = out.length();
+  if (len > 1e-12) out.multiplyScalar(1 / len);
+  return len;
+}
+
+/** Rayon de courbure estimé (m) à partir de trois points consécutifs. */
+function estimateCurvatureRadius(
+  prev: THREE.Vector3,
+  curr: THREE.Vector3,
+  next: THREE.Vector3,
+): number {
+  const a = prev.distanceTo(curr);
+  const b = curr.distanceTo(next);
+  const c = prev.distanceTo(next);
+  if (a < 1e-6 || b < 1e-6) return Infinity;
+  const cross = new THREE.Vector3()
+    .subVectors(next, curr)
+    .cross(new THREE.Vector3().subVectors(prev, curr));
+  const area2 = cross.length();
+  if (area2 < 1e-12) return Infinity;
+  return (a * b * c) / (2 * area2);
+}
+
+function smoothCircular(values: number[], window: number): number[] {
+  const N = values.length;
+  const out = new Array<number>(N);
+  for (let i = 0; i < N; i++) {
+    let sum = 0;
+    for (let k = -window; k <= window; k++) {
+      sum += values[(i + k + N) % N];
+    }
+    out[i] = sum / (window * 2 + 1);
+  }
+  return out;
+}
+
+function cornerAngle(prev: THREE.Vector3, curr: THREE.Vector3, next: THREE.Vector3): number {
+  const dIn = new THREE.Vector3().subVectors(curr, prev);
+  const dOut = new THREE.Vector3().subVectors(next, curr);
+  dIn.y = 0;
+  dOut.y = 0;
+  if (dIn.lengthSq() < 1e-12 || dOut.lengthSq() < 1e-12) return 0;
+  dIn.normalize();
+  dOut.normalize();
+  return Math.acos(Math.max(-1, Math.min(1, dIn.dot(dOut))));
+}
+
+/** Aplatit les pics résiduels en moyennant les sommets trop anguleux. */
+function flattenPolylineSpikes(polyline: THREE.Vector3[]): void {
+  const N = polyline.length;
+  const blend = new THREE.Vector3();
+  for (let pass = 0; pass < 3; pass++) {
+    for (let i = 0; i < N; i++) {
+      const prev = polyline[(i - 1 + N) % N];
+      const curr = polyline[i];
+      const next = polyline[(i + 1) % N];
+      if (cornerAngle(prev, curr, next) <= SPIKE_ANGLE_MAX) continue;
+      blend.copy(prev).add(next).multiplyScalar(0.5);
+      curr.lerp(blend, 0.75);
+    }
+  }
+}
+
+/**
+ * Décale une polyligne fermée le long de la courbe. Sur le bord intérieur des
+ * virages serrés (rayon < demi-largeur), l'offset est réduit puis lissé pour
+ * éviter les auto-intersections qui créent des pics de barrière.
+ */
+function computeOffsetPolyline(
+  center: THREE.Vector3[],
+  tangents: THREE.Vector3[],
+  halfWidth: number,
+  side: 'left' | 'right',
+): THREE.Vector3[] {
+  const N = center.length;
+  const sign = side === 'left' ? 1 : -1;
+  const offsets = new Array<number>(N);
+  const dIn = new THREE.Vector3();
+  const dOut = new THREE.Vector3();
+  const normal = new THREE.Vector3();
+
+  for (let i = 0; i < N; i++) {
+    const prev = center[(i - 1 + N) % N];
+    const curr = center[i];
+    const next = center[(i + 1) % N];
+
+    let offset = halfWidth;
+    const lenIn = horizontalDir(prev, curr, dIn);
+    const lenOut = horizontalDir(curr, next, dOut);
+    if (lenIn > 1e-6 && lenOut > 1e-6) {
+      const turn = dIn.x * dOut.z - dIn.z * dOut.x;
+      const isInnerEdge = side === 'left' ? turn < 0 : turn > 0;
+      if (isInnerEdge) {
+        const radius = estimateCurvatureRadius(prev, curr, next);
+        if (radius < halfWidth * 1.1) {
+          offset = Math.max(radius * 0.95, halfWidth * 0.2);
+        }
+      }
+    }
+    offsets[i] = offset;
+  }
+
+  const smoothed = smoothCircular(offsets, 10);
+  const result: THREE.Vector3[] = new Array(N);
+  for (let i = 0; i < N; i++) {
+    normal.crossVectors(UP, tangents[i]).multiplyScalar(sign);
+    result[i] = center[i].clone().addScaledVector(normal, smoothed[i]);
+  }
+
+  flattenPolylineSpikes(result);
+  return result;
+}
+
+/**
+ * Longueur de chanfrein pour un coin de barrière en fonction de l'angle entre
+ * segments et des longueurs de bord adjacentes.
+ */
+function computeBevelLength(angle: number, lenIn: number, lenOut: number): number {
+  if (angle < BEVEL_ANGLE_MIN) return 0;
+  const maxBevel = Math.min(lenIn * 0.48, lenOut * 0.48, 4.0);
+  const sharpness = Math.min(1, (angle - BEVEL_ANGLE_MIN) / (Math.PI / 8));
+  return maxBevel * sharpness;
+}
+
 export class TrackConstructor {
   constructor(
     private readonly world: RAPIER.World,
@@ -47,7 +180,7 @@ export class TrackConstructor {
     const curve = new THREE.CatmullRomCurve3(
       def.centerline.map((p) => new THREE.Vector3(p.x, p.y, p.z)),
       true,
-      'catmullrom',
+      'centripetal',
       0.5,
     );
     const length = curve.getLength();
@@ -59,19 +192,16 @@ export class TrackConstructor {
     const half = def.roadWidth / 2;
     const samples: THREE.Vector3[] = [];
     const tangents: THREE.Vector3[] = [];
-    const leftEdge: THREE.Vector3[] = [];
-    const rightEdge: THREE.Vector3[] = [];
-
     for (let i = 0; i < N; i++) {
       const u = i / N;
       const p = curve.getPointAt(u);
       const t = curve.getTangentAt(u).normalize();
-      const normal = new THREE.Vector3().crossVectors(UP, t).normalize(); // pointe vers la gauche
       samples.push(p);
       tangents.push(t);
-      leftEdge.push(p.clone().addScaledVector(normal, half));
-      rightEdge.push(p.clone().addScaledVector(normal, -half));
     }
+
+    const leftEdge = computeOffsetPolyline(samples, tangents, half, 'left');
+    const rightEdge = computeOffsetPolyline(samples, tangents, half, 'right');
 
     // --- Route ---
     this.buildRoad(group, trackBody, leftEdge, rightEdge, def, showTrackVisuals);
@@ -205,7 +335,7 @@ export class TrackConstructor {
     geo.computeVertexNormals();
 
     const mat = new THREE.MeshStandardMaterial({
-      color: 0x080808,
+      color: 0x222222,
       roughness: 0.98,
       metalness: 0.0,
     });
@@ -234,18 +364,49 @@ export class TrackConstructor {
     const N = edge.length;
     const positions: number[] = [];
     const indices: number[] = [];
+
+    const inTrim: THREE.Vector3[] = new Array(N);
+    const outTrim: THREE.Vector3[] = new Array(N);
+    const dIn = new THREE.Vector3();
+    const dOut = new THREE.Vector3();
+    const trim = new THREE.Vector3();
+
     for (let i = 0; i < N; i++) {
-      positions.push(edge[i].x, edge[i].y, edge[i].z); // bas
-      positions.push(edge[i].x, edge[i].y + height, edge[i].z); // haut
+      const prev = edge[(i - 1 + N) % N];
+      const curr = edge[i];
+      const next = edge[(i + 1) % N];
+
+      const lenIn = horizontalDir(prev, curr, dIn);
+      const lenOut = horizontalDir(curr, next, dOut);
+      const angle = lenIn > 1e-6 && lenOut > 1e-6
+        ? Math.acos(Math.max(-1, Math.min(1, dIn.dot(dOut))))
+        : 0;
+      const bevel = computeBevelLength(angle, lenIn, lenOut);
+
+      trim.copy(curr).addScaledVector(dIn, -bevel);
+      inTrim[i] = trim.clone();
+      trim.copy(curr).addScaledVector(dOut, bevel);
+      outTrim[i] = trim.clone();
     }
+
+    let vtx = 0;
+    const addVerticalQuad = (b0: THREE.Vector3, b1: THREE.Vector3): void => {
+      const base = vtx;
+      positions.push(b0.x, b0.y, b0.z);
+      positions.push(b0.x, b0.y + height, b0.z);
+      positions.push(b1.x, b1.y, b1.z);
+      positions.push(b1.x, b1.y + height, b1.z);
+      indices.push(base, base + 1, base + 2);
+      indices.push(base + 1, base + 3, base + 2);
+      vtx += 4;
+    };
+
     for (let i = 0; i < N; i++) {
       const j = (i + 1) % N;
-      const bi = 2 * i;
-      const ti = 2 * i + 1;
-      const bj = 2 * j;
-      const tj = 2 * j + 1;
-      indices.push(bi, ti, bj);
-      indices.push(ti, tj, bj);
+      addVerticalQuad(outTrim[i], inTrim[j]);
+      if (inTrim[i].distanceToSquared(outTrim[i]) > 1e-10) {
+        addVerticalQuad(inTrim[i], outTrim[i]);
+      }
     }
 
     const geo = new THREE.BufferGeometry();

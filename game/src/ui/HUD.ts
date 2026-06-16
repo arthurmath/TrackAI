@@ -7,8 +7,13 @@ import { formatTime, formatDelta } from '../utils/helpers';
 
 const SPEEDO_MAX_KMH = 320;
 const ARC_RADIUS = 80;
-// Arc de 270° centré en bas.
-const ARC_START = 135; // degrés
+const ARC_CENTER_X = 110;
+const ARC_CENTER_Y = 108;
+const SVG_WIDTH = 220;
+const SVG_HEIGHT = 210;
+const SVG_VIEWBOX_Y = -12;
+// Arc 270° : symétrie miroir (0 en bas-gauche, sens horaire) puis rotation +90°.
+const ARC_ZERO_ANGLE = 315; // position 0 km/h (haut-gauche après rotation)
 const ARC_SWEEP = 270;
 
 export class HUD {
@@ -37,19 +42,23 @@ export class HUD {
         </div>
       </div>
       <div class="hud-speed">
-        <svg width="220" height="150" viewBox="0 0 220 150">
-          <path id="speedo-bg" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="12" stroke-linecap="round"/>
-          <path id="speedo-fg" fill="none" stroke="url(#speedoGrad)" stroke-width="12" stroke-linecap="round"/>
-          <defs>
-            <linearGradient id="speedoGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stop-color="#2ecc71"/>
-              <stop offset="60%" stop-color="#ff8c42"/>
-              <stop offset="100%" stop-color="#ff3b30"/>
-            </linearGradient>
-          </defs>
-        </svg>
-        <div class="speed-value"><span id="hud-speed">0</span></div>
-        <div class="speed-unit">KM/H</div>
+        <div class="speedo-wrap">
+          <svg width="${SVG_WIDTH}" height="${SVG_HEIGHT}" viewBox="0 ${SVG_VIEWBOX_Y} ${SVG_WIDTH} ${SVG_HEIGHT}">
+            <path id="speedo-bg" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="12" stroke-linecap="round"/>
+            <path id="speedo-fg" fill="none" stroke="url(#speedoGrad)" stroke-width="12" stroke-linecap="round"/>
+            <defs>
+              <linearGradient id="speedoGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#2ecc71"/>
+                <stop offset="60%" stop-color="#ff8c42"/>
+                <stop offset="100%" stop-color="#ff3b30"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <div class="speedo-readout">
+            <div class="speed-value"><span id="hud-speed">0</span></div>
+            <div class="speed-unit">KM/H</div>
+          </div>
+        </div>
       </div>
     `;
     parent.appendChild(this.root);
@@ -62,7 +71,8 @@ export class HUD {
 
     const bg = this.root.querySelector('#speedo-bg') as SVGPathElement;
     this.arcFg = this.root.querySelector('#speedo-fg') as SVGPathElement;
-    const d = describeArc(110, 90, ARC_RADIUS, ARC_START, ARC_START + ARC_SWEEP);
+    const arcEnd = ARC_ZERO_ANGLE - ARC_SWEEP; // 45° — fin de l'arc en sens horaire
+    const d = describeArc(ARC_CENTER_X, ARC_CENTER_Y, ARC_RADIUS, arcEnd, ARC_ZERO_ANGLE, true);
     bg.setAttribute('d', d);
     this.arcFg.setAttribute('d', d);
     this.arcLength = this.arcFg.getTotalLength();
@@ -122,9 +132,19 @@ function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number): 
   return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
 }
 
-function describeArc(cx: number, cy: number, r: number, startAngle: number, endAngle: number): string {
+function describeArc(
+  cx: number,
+  cy: number,
+  r: number,
+  startAngle: number,
+  endAngle: number,
+  clockwise = false,
+): string {
   const [sx, sy] = polarToCartesian(cx, cy, r, endAngle);
   const [ex, ey] = polarToCartesian(cx, cy, r, startAngle);
-  const largeArc = endAngle - startAngle <= 180 ? '0' : '1';
-  return `M ${sx} ${sy} A ${r} ${r} 0 ${largeArc} 0 ${ex} ${ey}`;
+  const sweep = clockwise ? 1 : 0;
+  const ccwSpan = ((endAngle - startAngle) % 360 + 360) % 360;
+  const cwSpan = ((startAngle - endAngle) % 360 + 360) % 360;
+  const largeArc = clockwise ? (cwSpan <= 180 ? '1' : '0') : ccwSpan <= 180 ? '0' : '1';
+  return `M ${sx} ${sy} A ${r} ${r} 0 ${largeArc} ${sweep} ${ex} ${ey}`;
 }

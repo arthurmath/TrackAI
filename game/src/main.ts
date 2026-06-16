@@ -193,7 +193,10 @@ class App {
       controllers = [new HumanController(this.input)];
     }
 
-    this.session = await RaceSession.create(this.scene.scene, this.lighting, vehicleConfig, trackDef, controllers);
+    this.session = await RaceSession.create(
+      this.scene.scene, this.lighting, vehicleConfig, trackDef, controllers,
+      { cameraFollowLeader: this.aiMode === 'training' },
+    );
     this.menus.setProgress(1);
 
     await nextFrame();
