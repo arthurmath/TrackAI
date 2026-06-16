@@ -81,6 +81,12 @@ export const AI_CONFIG = {
    * leur expérience dans un buffer global partagé. En inférence, une seule.
    */
   trainingCars: 20,
+  /** Respawn au départ si la voiture ne progresse plus (entraînement). */
+  trainingStuckSeconds: 4,
+  /** Vitesse minimale (m/s) considérée comme du mouvement. */
+  trainingStuckSpeed: 1.0,
+  /** Déplacement horizontal minimal (m) pour réinitialiser le timer de blocage. */
+  trainingStuckMoveMeters: 1.5,
 } as const;
 
 /** Clé de stockage localStorage pour les meilleurs temps. */

@@ -195,7 +195,7 @@ class App {
 
     this.session = await RaceSession.create(
       this.scene.scene, this.lighting, vehicleConfig, trackDef, controllers,
-      { cameraFollowLeader: this.aiMode === 'training' },
+      { cameraFollowLeader: this.aiMode === 'training', trainingMode: this.aiMode === 'training' },
     );
     this.menus.setProgress(1);
 

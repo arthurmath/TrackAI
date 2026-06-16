@@ -91,15 +91,17 @@ export class AIController implements Controller {
     }
   }
 
-  pushObservation(obs: VehicleObservation): void {
-    if (!this.connected || !this.socket) return;
+  pushObservation(obs: VehicleObservation): boolean {
+    if (!this.connected || !this.socket) return false;
     const now = performance.now();
     const minInterval = 1000 / this.stateSendRate;
-    if (now - this.lastSendTime < minInterval) return;
+    if (now - this.lastSendTime < minInterval) return false;
     this.lastSendTime = now;
     if (this.socket.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify({ type: 'observation', data: obs }));
+      return true;
     }
+    return false;
   }
 
   sample(): ControlState {

@@ -17,6 +17,7 @@ import type { VehicleConfig } from '../assets/cars/types';
 import type { TrackDefinition } from '../assets/tracks/types';
 import type { Controller, VehicleObservation } from '../controllers/Controller';
 import type { Lighting } from '../rendering/Lighting';
+import { AI_CONFIG } from '../config';
 
 const SENSOR_ANGLES = [0, 0.5, -0.5, 1.0, -1.0]; // radians (avant, ±30°, ±60°)
 const SENSOR_MAX = 50;
@@ -34,6 +35,10 @@ interface SessionAgent {
   renderQuat: THREE.Quaternion;
   wheelTransforms: WheelTransform[];
   flippedTimer: number;
+  stuckTimer: number;
+  stuckRefX: number;
+  stuckRefZ: number;
+  episodeEnd: boolean;
 }
 
 export class RaceSession {
@@ -47,6 +52,8 @@ export class RaceSession {
   private readonly agents: SessionAgent[];
   /** En entraînement IA : la caméra suit la voiture la plus avancée sur le circuit. */
   private readonly cameraFollowLeader: boolean;
+  /** Active le respawn automatique après blocage (mode entraînement). */
+  private readonly trainingMode: boolean;
   private leaderIndex = 0;
 
   // Buffers réutilisés (observation/capteurs) pour éviter les allocations par frame.
@@ -65,7 +72,7 @@ export class RaceSession {
     vehicleConfig: VehicleConfig,
     trackDef: TrackDefinition,
     controllers: Controller[],
-    options?: { cameraFollowLeader?: boolean },
+    options?: { cameraFollowLeader?: boolean; trainingMode?: boolean },
   ): Promise<RaceSession> {
     const physics = new PhysicsWorld(trackDef.gravity);
     const assetLoader = new AssetLoader();
@@ -77,6 +84,7 @@ export class RaceSession {
     return new RaceSession(
       scene, lighting, vehicleConfig, trackDef, controllers, physics, track, views,
       options?.cameraFollowLeader ?? false,
+      options?.trainingMode ?? false,
     );
   }
 
@@ -90,6 +98,7 @@ export class RaceSession {
     track: BuiltTrack,
     views: VehicleView[],
     cameraFollowLeader: boolean,
+    trainingMode: boolean,
   ) {
     this.physics = physics;
     this.track = track;
@@ -97,6 +106,7 @@ export class RaceSession {
     this.trackDef = trackDef;
     this.lighting = lighting;
     this.cameraFollowLeader = cameraFollowLeader;
+    this.trainingMode = trainingMode;
 
     const spawn: VehicleSpawn = this.track.spawn;
     this.agents = controllers.map((controller, i) => {
@@ -115,11 +125,17 @@ export class RaceSession {
         renderQuat: new THREE.Quaternion(),
         wheelTransforms: [],
         flippedTimer: 0,
+        stuckTimer: 0,
+        stuckRefX: 0,
+        stuckRefZ: 0,
+        episodeEnd: false,
       };
       // Initialise les buffers d'interpolation.
       vehicle.getChassisTransform(agent.currPos, agent.currQuat);
       agent.prevPos.copy(agent.currPos);
       agent.prevQuat.copy(agent.currQuat);
+      agent.stuckRefX = agent.currPos.x;
+      agent.stuckRefZ = agent.currPos.z;
       return agent;
     });
 
@@ -147,6 +163,10 @@ export class RaceSession {
       if (control.reset) {
         agent.vehicle.respawn();
         agent.flippedTimer = 0;
+        agent.stuckTimer = 0;
+        agent.vehicle.getChassisTransform(agent.currPos, agent.currQuat);
+        agent.stuckRefX = agent.currPos.x;
+        agent.stuckRefZ = agent.currPos.z;
       }
 
       if (allowControl) {
@@ -187,15 +207,33 @@ export class RaceSession {
       } else {
         agent.flippedTimer = 0;
       }
-      if (agent.flippedTimer > 2.5 || agent.currPos.y < -10) {
+      const flipTimeout = this.trainingMode ? 1.5 : 2.5;
+      if (agent.flippedTimer > flipTimeout || agent.currPos.y < -10) {
         agent.vehicle.respawn();
         agent.flippedTimer = 0;
+        if (this.trainingMode) {
+          agent.stuckTimer = 0;
+          agent.stuckRefX = agent.currPos.x;
+          agent.stuckRefZ = agent.currPos.z;
+          agent.episodeEnd = true;
+        }
+      }
+
+      // En entraînement : respawn au départ si immobile trop longtemps.
+      if (this.trainingMode && allowControl && this.updateStuck(agent, dt)) {
+        agent.vehicle.respawn();
+        agent.flippedTimer = 0;
+        agent.stuckTimer = 0;
+        agent.stuckRefX = agent.currPos.x;
+        agent.stuckRefZ = agent.currPos.z;
+        agent.episodeEnd = true;
       }
 
       // Observation pour l'IA (si applicable). On n'envoie que pendant la phase
       // pilotable : les frames du compte à rebours fausseraient l'apprentissage.
       if (allowControl && agent.controller.pushObservation) {
-        agent.controller.pushObservation(this.buildObservation(agent, progress));
+        const sent = agent.controller.pushObservation(this.buildObservation(agent, progress));
+        if (sent) agent.episodeEnd = false;
       }
     }
     if (this.cameraFollowLeader) {
@@ -252,7 +290,30 @@ export class RaceSession {
       sensors,
       trackProgress: progress,
       offTrack,
+      episodeEnd: agent.episodeEnd || undefined,
     };
+  }
+
+  /** Retourne true si la voiture est bloquée assez longtemps pour forcer un respawn. */
+  private updateStuck(agent: SessionAgent, dt: number): boolean {
+    const moved = Math.hypot(
+      agent.currPos.x - agent.stuckRefX,
+      agent.currPos.z - agent.stuckRefZ,
+    );
+    const speed = Math.abs(agent.vehicle.forwardSpeed);
+    const moving =
+      speed >= AI_CONFIG.trainingStuckSpeed ||
+      moved >= AI_CONFIG.trainingStuckMoveMeters;
+
+    if (moving) {
+      agent.stuckTimer = 0;
+      agent.stuckRefX = agent.currPos.x;
+      agent.stuckRefZ = agent.currPos.z;
+      return false;
+    }
+
+    agent.stuckTimer += dt;
+    return agent.stuckTimer >= AI_CONFIG.trainingStuckSeconds;
   }
 
   private castSensors(agent: SessionAgent): number[] {

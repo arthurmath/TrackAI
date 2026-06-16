@@ -34,14 +34,16 @@ export interface VehicleObservation {
   trackProgress: number;
   /** True si la voiture est hors-piste / retournée. */
   offTrack: boolean;
+  /** True si l'épisode vient de se terminer (blocage, reset forcé). */
+  episodeEnd?: boolean;
 }
 
 export interface Controller {
   readonly kind: 'human' | 'ai';
   /** Lu chaque frame par le véhicule. */
   sample(): ControlState;
-  /** Optionnel : le véhicule pousse son observation (utile pour l'IA). */
-  pushObservation?(obs: VehicleObservation): void;
+  /** Optionnel : le véhicule pousse son observation (utile pour l'IA). Retourne true si envoyée. */
+  pushObservation?(obs: VehicleObservation): boolean;
   /** Demande l'arrêt de l'entraînement côté serveur IA (mode training uniquement). */
   requestStopTraining?(): void;
   dispose?(): void;

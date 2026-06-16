@@ -23,7 +23,8 @@ UPDATE_TIMESTEP = 2048
 # Sauvegarde automatique des poids toutes les N entrainements PPO.
 SAVE_EVERY = 100
 # Coupe un épisode si la voiture reste quasi immobile trop longtemps (anti-blocage).
-STUCK_LIMIT = 150        # pas
+# 30 Hz d'observations × 4 s = 120 pas (aligné sur AI_CONFIG.trainingStuckSeconds).
+STUCK_LIMIT = 120        # pas
 STUCK_SPEED = 1.0        # m/s
 TERMINAL_PENALTY = 10.0
 
@@ -251,6 +252,7 @@ async def start(websocket):
             progress = float(obs.get("trackProgress", 0.0))
             forward_speed = abs(float(obs.get("forwardSpeed", 0.0)))
             off_track = bool(obs.get("offTrack", False))
+            episode_end = bool(obs.get("episodeEnd", False))
 
             max_progress = max(max_progress, progress)
 
@@ -269,7 +271,7 @@ async def start(websocket):
                     stuck_steps += 1
                 else:
                     stuck_steps = 0
-                done = off_track or stuck_steps >= STUCK_LIMIT
+                done = off_track or episode_end or stuck_steps >= STUCK_LIMIT
 
                 if done:
                     reward -= TERMINAL_PENALTY
