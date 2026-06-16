@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { Plugin } from 'vite';
 
@@ -51,14 +52,46 @@ function sendJson(res: import('http').ServerResponse, status: number, body: unkn
 }
 
 /** Dev-only : démarre le serveur Python (`uv run main.py` dans `ai/`). */
+const SERIES_FILENAME_RE = /^history_[\w-]+\.json$/;
+
 export function aiServerPlugin(): Plugin {
   const aiDir = path.resolve(process.cwd(), '..', 'ai');
+  const seriesDir = path.join(aiDir, 'results', 'series');
 
   return {
     name: 'trackai-ai-server',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         const url = req.url?.split('?')[0];
+
+        if (url === '/api/ai-series' && req.method === 'GET') {
+          try {
+            const entries = await fs.readdir(seriesDir);
+            const files = entries.filter((f) => f.endsWith('.json')).sort().reverse();
+            sendJson(res, 200, files);
+          } catch {
+            sendJson(res, 200, []);
+          }
+          return;
+        }
+
+        const seriesMatch = url?.match(/^\/api\/ai-series\/([^/]+)$/);
+        if (seriesMatch && req.method === 'GET') {
+          const filename = decodeURIComponent(seriesMatch[1]);
+          if (!SERIES_FILENAME_RE.test(filename)) {
+            sendJson(res, 400, { error: 'Invalid filename' });
+            return;
+          }
+          try {
+            const content = await fs.readFile(path.join(seriesDir, filename), 'utf-8');
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(content);
+          } catch {
+            sendJson(res, 404, { error: 'Not found' });
+          }
+          return;
+        }
 
         if (url === '/api/ai-server/status' && req.method === 'GET') {
           sendJson(res, 200, { running: await isAiServerRunning() });

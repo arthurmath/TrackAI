@@ -10,6 +10,7 @@ import { formatTime } from '../utils/helpers';
 import { getBestTimeMs } from '../utils/Storage';
 
 import { AI_CONFIG } from '../config';
+import { attachTrainingChart, type ScorePoint } from './TrainingGraph';
 
 export interface SavedWeight {
   filename: string;
@@ -55,36 +56,52 @@ export class Menus {
     s.querySelector('#m-editor')!.addEventListener('click', cb.onEditor);
   }
 
-  private weightPickerHtml(id: string, weights: SavedWeight[]): string {
-    if (!weights.length) {
+  private optionPickerHtml(
+    id: string,
+    label: string,
+    items: { value: string; label: string }[],
+    emptyMessage = 'Aucune option',
+  ): string {
+    if (!items.length) {
       return `
         <div class="weight-picker disabled">
-          <span class="warm-label">Poids sauvegardés</span>
-          <div class="weight-empty">Aucun poids sauvegardé</div>
+          <span class="warm-label">${label}</span>
+          <div class="weight-empty">${emptyMessage}</div>
         </div>`;
     }
-    const first = weights[0];
-    const firstLabel = `score ${first.score}${first.timestamp ? ` · ${first.timestamp}` : ''}`;
-    const options = weights
+    const first = items[0];
+    const options = items
       .map(
-        (w, i) =>
-          `<button type="button" class="weight-option${i === 0 ? ' selected' : ''}" data-value="${w.filename}">score ${w.score}${w.timestamp ? ` · ${w.timestamp}` : ''}</button>`,
+        (item, i) =>
+          `<button type="button" class="weight-option${i === 0 ? ' selected' : ''}" data-value="${item.value}">${item.label}</button>`,
       )
       .join('');
     return `
       <div class="weight-picker" data-picker="${id}">
-        <span class="warm-label">Poids sauvegardés</span>
+        <span class="warm-label">${label}</span>
         <div class="weight-dropdown">
           <button type="button" class="weight-trigger">
-            <span class="weight-value">${firstLabel}</span>
+            <span class="weight-value">${first.label}</span>
             <span class="weight-chevron" aria-hidden="true">▾</span>
           </button>
           <div class="weight-menu hidden">
             ${options}
           </div>
         </div>
-        <input type="hidden" class="weight-input" value="${first.filename}" />
+        <input type="hidden" class="weight-input" value="${first.value}" />
       </div>`;
+  }
+
+  private weightPickerHtml(id: string, weights: SavedWeight[]): string {
+    return this.optionPickerHtml(
+      id,
+      'Poids sauvegardés',
+      weights.map((w) => ({
+        value: w.filename,
+        label: `score ${w.score}${w.timestamp ? ` · ${w.timestamp}` : ''}`,
+      })),
+      'Aucun poids sauvegardé',
+    );
   }
 
   private setupWeightPicker(panel: HTMLElement, onChange: () => void): HTMLInputElement {
@@ -132,6 +149,7 @@ export class Menus {
       onPlayStart: (filename: string) => void;
       onColdStart: () => void;
       onWarmStart: (filename: string) => void;
+      onGraphs: () => void;
       onBack: () => void;
     },
   ): void {
@@ -162,6 +180,9 @@ export class Menus {
           <div class="ai-panel hidden" id="warm-panel">
             ${this.weightPickerHtml('warm', weights)}
           </div>
+        </div>
+        <div class="ai-mode-col">
+          <button class="btn graphs" id="ai-graphs">Graphs</button>
         </div>
       </div>
       <div class="menu-col ai-nav-row">
@@ -235,7 +256,90 @@ export class Menus {
       else if (selectedMode === 'play' && playerInput.value) cb.onPlayStart(playerInput.value);
       else if (selectedMode === 'warm' && warmInput.value) cb.onWarmStart(warmInput.value);
     });
+    s.querySelector('#ai-graphs')!.addEventListener('click', cb.onGraphs);
     s.querySelector('#ai-back')!.addEventListener('click', cb.onBack);
+  }
+
+  static async fetchSeriesFiles(): Promise<string[]> {
+    try {
+      const res = await fetch(AI_CONFIG.seriesListApiUrl);
+      if (!res.ok) return [];
+      return (await res.json()) as string[];
+    } catch {
+      return [];
+    }
+  }
+
+  static async fetchSeriesData(filename: string): Promise<ScorePoint[]> {
+    try {
+      const res = await fetch(`${AI_CONFIG.seriesDataApiUrl}${encodeURIComponent(filename)}`);
+      if (!res.ok) return [];
+      const data = (await res.json()) as { scores_history?: ScorePoint[] };
+      return data.scores_history ?? [];
+    } catch {
+      return [];
+    }
+  }
+
+  showAIGraphs(cb: { onBack: () => void }): void {
+    void this.renderAIGraphs(cb);
+  }
+
+  private async renderAIGraphs(cb: { onBack: () => void }): Promise<void> {
+    const files = await Menus.fetchSeriesFiles();
+    const fileItems = files.map((f) => ({ value: f, label: f }));
+
+    const s = this.screen(`
+      <h2>Graphs</h2>
+      <div class="subtitle">Évolution de l'entraînement · ai/results/series</div>
+      <div class="graphs-toolbar">
+        <div class="graphs-file-picker" id="graphs-file-picker">
+          ${this.optionPickerHtml('graphs-file', 'Fichier', fileItems, 'Aucun fichier')}
+        </div>
+        <label class="graphs-toggle">
+          <input type="checkbox" id="graphs-show-best" checked />
+          <span>best_progress</span>
+        </label>
+      </div>
+      <div class="graphs-canvas-wrap">
+        <canvas id="training-chart" class="training-chart"></canvas>
+      </div>
+      <div class="menu-col graphs-nav-row">
+        <button class="btn ghost" id="graphs-back">Retour</button>
+      </div>
+    `);
+
+    const pickerRoot = s.querySelector('#graphs-file-picker') as HTMLElement;
+    const showBestInput = s.querySelector<HTMLInputElement>('#graphs-show-best')!;
+    const canvas = s.querySelector<HTMLCanvasElement>('#training-chart')!;
+
+    let points: ScorePoint[] = files.length ? await Menus.fetchSeriesData(files[0]) : [];
+
+    const chart = attachTrainingChart(
+      canvas,
+      () => points,
+      () => showBestInput.checked,
+    );
+
+    const loadFile = async (filename: string): Promise<void> => {
+      points = filename ? await Menus.fetchSeriesData(filename) : [];
+      chart.redraw();
+    };
+
+    const closePickers = (): void => {
+      s.querySelectorAll('.weight-menu').forEach((m) => m.classList.add('hidden'));
+      s.querySelectorAll('.weight-trigger').forEach((t) => t.classList.remove('open'));
+    };
+
+    s.addEventListener('click', closePickers);
+
+    const fileInput = this.setupWeightPicker(pickerRoot, () => void loadFile(fileInput.value));
+
+    showBestInput.addEventListener('change', chart.redraw);
+    s.querySelector('#graphs-back')!.addEventListener('click', () => {
+      chart.destroy();
+      cb.onBack();
+    });
   }
 
   static async fetchSavedWeights(): Promise<SavedWeight[]> {

@@ -131,7 +131,15 @@ class App {
         this.aiInit = { kind: 'training', mode: 'warm', weightsFile: filename };
         this.goToVehicleSelect();
       },
+      onGraphs: () => this.goToAIGraphs(),
       onBack: () => this.goToMenu(),
+    });
+  }
+
+  private goToAIGraphs(): void {
+    this.state = 'menu';
+    this.menus.showAIGraphs({
+      onBack: () => void this.goToAIMenu(),
     });
   }
 

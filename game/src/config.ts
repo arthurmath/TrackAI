@@ -69,6 +69,10 @@ export const AI_CONFIG = {
   weightsApiUrl: 'http://localhost:8765/weights',
   /** URL pour démarrer le serveur Python (plugin Vite, dev uniquement). */
   serverStartUrl: '/api/ai-server/start',
+  /** Liste des fichiers d'historique d'entraînement (plugin Vite, dev uniquement). */
+  seriesListApiUrl: '/api/ai-series',
+  /** Préfixe pour charger un fichier d'historique (plugin Vite, dev uniquement). */
+  seriesDataApiUrl: '/api/ai-series/',
   /** Fréquence d'envoi de l'état au serveur IA (Hz). */
   stateSendRate: 30,
   /**
