@@ -30,6 +30,16 @@ export const CAMERA_CONFIG = {
   fovSpeedReference: 60,
 } as const;
 
+export const ORBIT_CAMERA_CONFIG = {
+  /** Vitesse de déplacement du centre de visée avec ZQSD (m/s). */
+  panSpeed: 20,
+  /** Hauteur initiale de la caméra au-dessus du spawn. */
+  initialHeight: 7,
+  /** Distance initiale en profondeur depuis le spawn. */
+  initialDistance: 27,
+  fov: 52,
+} as const;
+
 export const GRAPHICS_CONFIG = {
   shadows: true,
   shadowMapSize: 2048,

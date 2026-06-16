@@ -1,0 +1,56 @@
+{
+  "scores_history": [
+    {
+      "iteration": 13,
+      "avg_progress": 0.03870192307692307,
+      "best_progress": 0.11875
+    },
+    {
+      "iteration": 71,
+      "avg_progress": 0.14531249999999998,
+      "best_progress": 0.215625
+    },
+    {
+      "iteration": 83,
+      "avg_progress": 0.024999999999999998,
+      "best_progress": 0.215625
+    },
+    {
+      "iteration": 94,
+      "avg_progress": 0.029829545454545456,
+      "best_progress": 0.215625
+    },
+    {
+      "iteration": 107,
+      "avg_progress": 0.037980769230769235,
+      "best_progress": 0.215625
+    }
+  ],
+  "rewards_history": [
+    {
+      "iteration": 13,
+      "avg_reward": -0.6425375114419867,
+      "best_reward": 0.4875318145751956
+    },
+    {
+      "iteration": 71,
+      "avg_reward": -0.7882157860889131,
+      "best_reward": 0.49849132537841684
+    },
+    {
+      "iteration": 83,
+      "avg_reward": -0.6490657050139796,
+      "best_reward": 0.4025156497955325
+    },
+    {
+      "iteration": 94,
+      "avg_reward": -0.6788436047172606,
+      "best_reward": 0.4345919609069813
+    },
+    {
+      "iteration": 107,
+      "avg_reward": -0.6302147791116886,
+      "best_reward": 0.49994522094726596
+    }
+  ]
+}

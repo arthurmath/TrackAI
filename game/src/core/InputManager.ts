@@ -47,6 +47,22 @@ export class InputManager {
     return this.isDown('Space');
   }
 
+  /** Pan horizontal du centre orbit (-1 gauche .. +1 droite). */
+  get orbitPanX(): number {
+    let v = 0;
+    if (this.isDown('KeyD') || this.isDown('ArrowRight')) v += 1;
+    if (this.isDown('KeyQ') || this.isDown('ArrowLeft') || this.isDown('KeyA')) v -= 1;
+    return v;
+  }
+
+  /** Pan avant/arrière du centre orbit (-1 arrière .. +1 avant). */
+  get orbitPanZ(): number {
+    let v = 0;
+    if (this.isDown('KeyZ') || this.isDown('ArrowUp') || this.isDown('KeyW')) v += 1;
+    if (this.isDown('KeyS') || this.isDown('ArrowDown')) v -= 1;
+    return v;
+  }
+
   on(event: ActionEvent, cb: () => void): () => void {
     if (!this.listeners.has(event)) this.listeners.set(event, new Set());
     this.listeners.get(event)!.add(cb);

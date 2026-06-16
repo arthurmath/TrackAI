@@ -10,6 +10,7 @@ import { initPhysics } from './physics/PhysicsWorld';
 import { SceneManager } from './rendering/SceneManager';
 import { Lighting } from './rendering/Lighting';
 import { CameraController } from './rendering/CameraController';
+import { OrbitCameraController } from './rendering/OrbitCameraController';
 import { PostProcessing } from './rendering/PostProcessing';
 import { GameLoop } from './core/GameLoop';
 import { InputManager } from './core/InputManager';
@@ -32,6 +33,7 @@ class App {
   private readonly scene: SceneManager;
   private readonly lighting: Lighting;
   private readonly camera: CameraController;
+  private readonly orbitCamera: OrbitCameraController;
   private readonly post: PostProcessing;
   private readonly input: InputManager;
   private readonly loop: GameLoop;
@@ -70,6 +72,7 @@ class App {
     this.debug = new DebugOverlay(this.uiRoot);
 
     this.input = new InputManager();
+    this.orbitCamera = new OrbitCameraController(this.scene.camera, canvas, this.input);
     this.bindInput();
 
     // Décor de fond pour les menus (lumière douce + ciel).
@@ -195,7 +198,7 @@ class App {
 
     this.session = await RaceSession.create(
       this.scene.scene, this.lighting, vehicleConfig, trackDef, controllers,
-      { cameraFollowLeader: this.aiMode === 'training', trainingMode: this.aiMode === 'training' },
+      { trainingMode: this.aiMode === 'training' },
     );
     this.menus.setProgress(1);
 
@@ -206,6 +209,9 @@ class App {
     this.hud.show();
     if (this.aiMode === 'training') {
       this.hud.showTrainingControls(() => this.stopTraining());
+      this.orbitCamera.activate(this.session.track.spawn.position);
+    } else {
+      this.orbitCamera.deactivate();
     }
     this.input.setEnabled(true);
     this.state = 'racing';
@@ -269,14 +275,22 @@ class App {
   };
 
   private render = (alpha: number, frameDt: number): void => {
+    const trainingView = this.aiMode === 'training' && this.orbitCamera.isActive;
+
     if (this.session) {
       this.session.render(alpha);
-      this.camera.update(
-        this.session.renderPosition,
-        this.session.renderRotation,
-        this.session.vehicle.forwardSpeed,
-        frameDt,
-      );
+
+      if (trainingView) {
+        this.orbitCamera.update(frameDt);
+        this.lighting.followTarget(this.orbitCamera.target);
+      } else {
+        this.camera.update(
+          this.session.renderPosition,
+          this.session.renderRotation,
+          this.session.vehicle.forwardSpeed,
+          frameDt,
+        );
+      }
 
       const snap = this.session.race.snapshot();
       if (this.state === 'racing' && snap.state === 'countdown') {
@@ -287,12 +301,11 @@ class App {
       if (this.state === 'racing' || this.state === 'paused') {
         this.hud.update(snap, this.session.speedKmh);
       }
-      this.post.setSpeed(this.session.speed01);
+      this.post.setSpeed(trainingView ? 0 : this.session.speed01);
     }
 
     this.debug.update(frameDt, this.session ? [
-      `Speed ${this.session.speedKmh.toFixed(0)} km/h`,
-      `Cam ${this.camera.mode}`,
+      trainingView ? 'Cam orbit' : `Cam ${this.camera.mode}`,
       `State ${this.state}`,
     ] : [`State ${this.state}`]);
 
@@ -305,12 +318,15 @@ class App {
 
   private bindInput(): void {
     this.input.on('pause', () => this.togglePause());
-    this.input.on('cycleCamera', () => this.camera.cycle());
+    this.input.on('cycleCamera', () => {
+      if (this.aiMode !== 'training') this.camera.cycle();
+    });
     this.input.on('toggleDebug', () => this.debug.toggle());
     // 'reset' est consommé par le HumanController/RaceSession.
   }
 
   private disposeSession(): void {
+    this.orbitCamera.deactivate();
     if (this.session) {
       this.session.dispose(this.scene.scene);
       this.session = null;

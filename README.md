@@ -7,6 +7,12 @@ cd game
 npm install  
 npm run dev  
 
+
+## Manually start the python server
+
+cd ai 
+uv run main.py
+
 ---
 
 ## Architecture
