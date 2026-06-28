@@ -7,6 +7,10 @@ from torch.distributions import Normal
 from utils import device, format
 
 
+ACTION_STD_MIN = 0.25
+LOG_ACTION_STD_MIN = math.log(ACTION_STD_MIN)
+
+
 class ActorCritic(nn.Module):
     """Réseau acteur-critique pour actions CONTINUES.
 
@@ -38,17 +42,21 @@ class ActorCritic(nn.Module):
         critic_layers.append(nn.Linear(last_dim, 1))
         self.critic = nn.Sequential(*critic_layers)
 
-        # Écart-type appris (log) — partagé entre tous les états.
+        # Écart-type appris partagé entre tous les états.
         self.log_std = nn.Parameter(torch.ones(action_dim) * math.log(action_std_init))
 
     def _dist(self, state):
         mean = self.actor(state)
-        std = self.log_std.exp().expand_as(mean)
+        std = self.log_std.clamp(min=LOG_ACTION_STD_MIN).exp().expand_as(mean)
         return Normal(mean, std)
+
+    def clamp_action_std_min(self):
+        with torch.no_grad():
+            self.log_std.clamp_(min=LOG_ACTION_STD_MIN)
 
     def act(self, state):
         dist = self._dist(state)
-        action = dist.sample()
+        action = torch.clamp(dist.sample(), -1.0, 1.0)
         action_logprob = dist.log_prob(action).sum(dim=-1)
         state_val = self.critic(state)
         return action.detach(), action_logprob.detach(), state_val.detach()
@@ -183,6 +191,7 @@ class Agent:
                     loss.mean().backward()
                     torch.nn.utils.clip_grad_norm_(self.policy.parameters(), 0.5)
                     self.optimizer.step()
+                    self.policy.clamp_action_std_min()
 
             self.policy_old.load_state_dict(self.policy.state_dict())
             buffer.clear()

@@ -30,6 +30,9 @@ STUCK_SPEED = 1.0        # m/s
 # voiture craintive et l'incite à rester immobile (rester bloqué devient "plus
 # sûr" que de tenter d'avancer). L'immobilité est déjà punie par compute_reward.
 TERMINAL_PENALTY = 2.0
+# En entraînement, garde un léger couple moteur même si la politique converge
+# vers une action "drive" basse. Cela évite le collapse immobile au spawn.
+TRAINING_MIN_THROTTLE = 0.15
 
 
 agent = Agent(
@@ -67,17 +70,22 @@ training_init_applied = False
 training_init_lock = asyncio.Lock()
 
 
-def action_to_control(action, reset=False):
+def action_to_control(action, reset=False, min_throttle=0.0):
     """Convertit le vecteur d'action continu en ControlState attendu par le jeu.
 
-    action = [longitudinal, steer], chacun ~[-1, 1].
-      longitudinal > 0 -> accélère ; < 0 -> freine / marche arrière.
+    action = [drive, steer], chacun ~[-1, 1].
+      drive -1 -> roue libre ; +1 -> accélération pleine.
+
+    L'IA n'a pas besoin d'apprendre la marche arrière pour sortir du départ. La
+    représenter par des valeurs négatives faisait vite converger PPO vers une
+    politique immobile/freinée après quelques mises à jour.
     """
     a_long = max(-1.0, min(1.0, float(action[0])))
     a_steer = max(-1.0, min(1.0, float(action[1])))
+    throttle = 0.0 if reset else max(min_throttle, (a_long + 1.0) * 0.5)
     return {
-        "throttle": max(0.0, a_long),
-        "brake": max(0.0, -a_long),
+        "throttle": throttle,
+        "brake": 0.0,
         "steer": a_steer,
         "handbrake": False,
         "reset": reset,
@@ -292,7 +300,7 @@ async def start(websocket):
             state = extract_state(obs)
             action = agent.act_train(state, local_buffer)
             prev_progress = progress
-            await send_action(websocket, action_to_control(action))
+            await send_action(websocket, action_to_control(action, min_throttle=TRAINING_MIN_THROTTLE))
 
     except websockets.exceptions.ConnectionClosed:
         pass

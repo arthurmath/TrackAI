@@ -32,7 +32,7 @@ async function waitForServer(maxAttempts = 30): Promise<boolean> {
 function startAiProcess(aiDir: string): void {
   if (aiProcess && !aiProcess.killed) return;
 
-  aiProcess = spawn('uv run main.py', {
+  aiProcess = spawn('python3 main.py', {
     cwd: aiDir,
     shell: true,
     detached: true,

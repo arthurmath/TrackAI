@@ -150,12 +150,7 @@ export class RaceSession {
       const control = agent.controller.sample();
 
       if (control.reset) {
-        agent.vehicle.respawn();
-        agent.flippedTimer = 0;
-        agent.stuckTimer = 0;
-        agent.vehicle.getChassisTransform(agent.currPos, agent.currQuat);
-        agent.stuckRefX = agent.currPos.x;
-        agent.stuckRefZ = agent.currPos.z;
+        this.respawnAgent(agent);
       }
 
       if (allowControl) {
@@ -176,7 +171,7 @@ export class RaceSession {
       agent.prevQuat.copy(agent.currQuat);
       agent.vehicle.getChassisTransform(agent.currPos, agent.currQuat);
 
-      const progress = this.track.getProgress(agent.currPos);
+      let progress = this.track.getProgress(agent.currPos);
 
       // Le recorder ne suit que l'agent principal.
       if (i === 0) {
@@ -191,23 +186,17 @@ export class RaceSession {
       }
       const flipTimeout = this.trainingMode ? 1.5 : 2.5;
       if (agent.flippedTimer > flipTimeout || agent.currPos.y < -10) {
-        agent.vehicle.respawn();
-        agent.flippedTimer = 0;
+        this.respawnAgent(agent);
+        progress = this.track.getProgress(agent.currPos);
         if (this.trainingMode) {
-          agent.stuckTimer = 0;
-          agent.stuckRefX = agent.currPos.x;
-          agent.stuckRefZ = agent.currPos.z;
           agent.episodeEnd = true;
         }
       }
 
       // En entraînement : respawn au départ si immobile trop longtemps.
       if (this.trainingMode && allowControl && this.updateStuck(agent, dt)) {
-        agent.vehicle.respawn();
-        agent.flippedTimer = 0;
-        agent.stuckTimer = 0;
-        agent.stuckRefX = agent.currPos.x;
-        agent.stuckRefZ = agent.currPos.z;
+        this.respawnAgent(agent);
+        progress = this.track.getProgress(agent.currPos);
         agent.episodeEnd = true;
       }
 
@@ -293,6 +282,17 @@ export class RaceSession {
 
     agent.stuckTimer += dt;
     return agent.stuckTimer >= AI_CONFIG.trainingStuckSeconds;
+  }
+
+  private respawnAgent(agent: SessionAgent): void {
+    agent.vehicle.respawn();
+    agent.flippedTimer = 0;
+    agent.stuckTimer = 0;
+    agent.vehicle.getChassisTransform(agent.currPos, agent.currQuat);
+    agent.prevPos.copy(agent.currPos);
+    agent.prevQuat.copy(agent.currQuat);
+    agent.stuckRefX = agent.currPos.x;
+    agent.stuckRefZ = agent.currPos.z;
   }
 
   private castSensors(agent: SessionAgent): number[] {

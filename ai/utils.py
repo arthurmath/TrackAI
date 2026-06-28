@@ -18,7 +18,7 @@ os.makedirs(series_dir, exist_ok=True)
 # --- Dimensions du problème (partagées par main.py et l'agent) ----------------
 # État : [forwardSpeed, lateralSpeed, 5 capteurs, offTrack] -> 8
 STATE_DIM = 8
-# Action continue : [longitudinal (throttle/brake), steer] -> 2
+# Action continue : [drive (coast/throttle), steer] -> 2
 ACTION_DIM = 2
 SENSOR_MAX = 50.0          # doit correspondre à SENSOR_MAX dans RaceSession.ts
 SPEED_NORM = 40.0          # normalisation des vitesses (m/s)
