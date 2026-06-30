@@ -21,6 +21,9 @@ import { AI_CONFIG } from '../config';
 
 const SENSOR_ANGLES = [0, 0.5, -0.5, 1.0, -1.0]; // radians (avant, ±30°, ±60°)
 const SENSOR_MAX = 50;
+// Distances (m) des points de visée échantillonnés DEVANT la voiture sur la
+// courbe centrale, pour donner à l'IA l'anticipation des virages.
+const LOOKAHEAD_DISTANCES = [10, 25];
 
 /** Un véhicule piloté dans la session : physique, vue, contrôleur, buffers. */
 interface SessionAgent {
@@ -57,6 +60,9 @@ export class RaceSession {
   private readonly _vel = new THREE.Vector3();
   private readonly _fwd = new THREE.Vector3();
   private readonly _ray = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 });
+  private readonly _aim = new THREE.Vector3();
+  // Longueur totale de la courbe centrale (m), calculée à la demande puis mise en cache.
+  private _curveLength = 0;
 
   /**
    * Factory asynchrone : construit le monde physique, le circuit (chargement GLB
@@ -249,6 +255,7 @@ export class RaceSession {
     const onCurve = this.track.curve.getPointAt(progress);
     const dist = Math.hypot(onCurve.x - t.x, onCurve.z - t.z);
     const offTrack = dist > this.trackDef.roadWidth * 0.6 || agent.vehicle.isFlipped();
+    const lookahead = this.castLookahead(agent, progress);
 
     return {
       position: [t.x, t.y, t.z],
@@ -258,8 +265,43 @@ export class RaceSession {
       sensors,
       trackProgress: progress,
       offTrack,
+      lookahead,
       episodeEnd: agent.episodeEnd || undefined,
     };
+  }
+
+  /**
+   * Direction vers des points de visée situés DEVANT la voiture sur la courbe
+   * centrale, exprimée dans le repère local (droite, avant) et normalisée.
+   * Retourne [droite_10m, avant_10m, droite_25m, avant_25m]. Un virage à droite
+   * imminent donne une composante « droite » positive et croissante.
+   */
+  private castLookahead(agent: SessionAgent, progress: number): number[] {
+    const t = agent.vehicle.body.translation();
+    agent.vehicle.getForward(this._fwd);
+    // Repère local en projection horizontale (xz). right = forward tourné de -90°.
+    const fx = this._fwd.x;
+    const fz = this._fwd.z;
+    const fLen = Math.hypot(fx, fz) || 1;
+    const fwdX = fx / fLen;
+    const fwdZ = fz / fLen;
+    const rightX = fwdZ;
+    const rightZ = -fwdX;
+
+    if (this._curveLength === 0) this._curveLength = this.track.curve.getLength();
+
+    const out: number[] = [];
+    for (const meters of LOOKAHEAD_DISTANCES) {
+      const u = (progress + meters / this._curveLength) % 1;
+      this.track.curve.getPointAt(u, this._aim);
+      const dx = this._aim.x - t.x;
+      const dz = this._aim.z - t.z;
+      const localRight = dx * rightX + dz * rightZ;
+      const localFwd = dx * fwdX + dz * fwdZ;
+      const len = Math.hypot(localRight, localFwd) || 1;
+      out.push(localRight / len, localFwd / len);
+    }
+    return out;
   }
 
   /** Retourne true si la voiture est bloquée assez longtemps pour forcer un respawn. */

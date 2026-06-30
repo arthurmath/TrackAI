@@ -16,8 +16,9 @@ os.makedirs(series_dir, exist_ok=True)
 
 
 # --- Dimensions du problème (partagées par main.py et l'agent) ----------------
-# État : [forwardSpeed, lateralSpeed, 5 capteurs, offTrack] -> 8
-STATE_DIM = 8
+# État : [forwardSpeed, lateralSpeed, 5 capteurs, offTrack,
+#         lookahead 10m (droite, avant), lookahead 25m (droite, avant)] -> 12
+STATE_DIM = 12
 # Action continue : [drive (coast/throttle), steer] -> 2
 ACTION_DIM = 2
 SENSOR_MAX = 50.0          # doit correspondre à SENSOR_MAX dans RaceSession.ts
@@ -94,6 +95,9 @@ def extract_state(obs):
     rot = obs.get("rotation", [0.0, 0.0, 0.0, 1.0])
     sensors = obs.get("sensors", [])
     off = bool(obs.get("offTrack", False))
+    # Direction vers les points de visée (repère local voiture, déjà unitaires) :
+    # [droite_10m, avant_10m, droite_25m, avant_25m]. Cf. RaceSession.castLookahead.
+    lookahead = obs.get("lookahead", [0.0, 1.0, 0.0, 1.0])
 
     # Vitesse latérale signée = projection de la vitesse sur l'axe droite.
     rx, ry, rz = _right_vector(rot)
@@ -104,6 +108,8 @@ def extract_state(obs):
         d = sensors[i] if i < len(sensors) else SENSOR_MAX
         state.append(min(float(d), SENSOR_MAX) / SENSOR_MAX)
     state.append(1.0 if off else 0.0)
+    for i in range(4):
+        state.append(float(lookahead[i]) if i < len(lookahead) else 0.0)
     return state
 
 
@@ -113,13 +119,15 @@ def extract_state(obs):
 IDLE_SPEED = 1.0
 # Pénalité par pas quand la voiture est quasi immobile (incite à démarrer).
 IDLE_PENALTY = 0.5
-# Récompense dense par m/s d'avance : signal local fort pour sortir du départ.
-SPEED_REWARD = 0.1
+# Petit gradient de vitesse résiduel pour aider au démarrage. La progression
+# (delta*100) récompense déjà la vitesse dans la BONNE direction, donc ce terme
+# reste volontairement faible pour ne pas la dominer.
+SPEED_REWARD = 0.01
 # Petit coût de temps constant.
 TIME_PENALTY = 0.02
 # Pénalité par pas hors-piste (modérée : rester bloqué ne doit jamais être
 # "plus sûr" que d'avancer).
-OFFTRACK_PENALTY = 0.5
+OFFTRACK_PENALTY = 1.0
 
 
 def compute_reward(prev_progress, obs):
@@ -220,7 +228,13 @@ def load_checkpoint_file(path, policy, policy_old, optimizer=None):
         print(f"Checkpoint not found: {path}")
         return False
     # print(f"Loading weights: {path}")
-    _load_checkpoint(path, policy, policy_old, optimizer)
+    try:
+        _load_checkpoint(path, policy, policy_old, optimizer)
+    except RuntimeError as e:
+        # Typiquement une incompatibilité de dimensions (ex. STATE_DIM a changé) :
+        # on signale l'échec pour laisser l'appelant retomber sur un cold start.
+        print(f"Incompatible checkpoint {os.path.basename(path)}: {e}")
+        return False
     return True
 
 

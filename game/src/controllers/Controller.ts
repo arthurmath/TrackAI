@@ -32,6 +32,13 @@ export interface VehicleObservation {
   sensors: number[];
   /** Progression sur le circuit [0..1] (position le long de la courbe centrale). */
   trackProgress: number;
+  /**
+   * Direction vers 2 points de visée sur la courbe centrale (10 m puis 25 m
+   * devant), exprimée dans le repère local de la voiture et normalisée :
+   * [droite_10m, avant_10m, droite_25m, avant_25m]. Donne à l'IA l'anticipation
+   * des virages à venir.
+   */
+  lookahead: number[];
   /** True si la voiture est hors-piste / retournée. */
   offTrack: boolean;
   /** True si l'épisode vient de se terminer (blocage, reset forcé). */
