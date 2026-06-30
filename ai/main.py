@@ -30,9 +30,6 @@ STUCK_SPEED = 1.0        # m/s
 # voiture craintive et l'incite à rester immobile (rester bloqué devient "plus
 # sûr" que de tenter d'avancer). L'immobilité est déjà punie par compute_reward.
 TERMINAL_PENALTY = 2.0
-# En entraînement, garde un léger couple moteur même si la politique converge
-# vers une action "drive" basse. Cela évite le collapse immobile au spawn.
-TRAINING_MIN_THROTTLE = 0.15
 
 
 agent = Agent(
@@ -70,22 +67,21 @@ training_init_applied = False
 training_init_lock = asyncio.Lock()
 
 
-def action_to_control(action, reset=False, min_throttle=0.0):
+def action_to_control(action, reset=False):
     """Convertit le vecteur d'action continu en ControlState attendu par le jeu.
 
     action = [drive, steer], chacun ~[-1, 1].
-      drive -1 -> roue libre ; +1 -> accélération pleine.
+      drive > 0 -> accélère (throttle) ; drive < 0 -> freine (brake).
 
-    L'IA n'a pas besoin d'apprendre la marche arrière pour sortir du départ. La
-    représenter par des valeurs négatives faisait vite converger PPO vers une
-    politique immobile/freinée après quelques mises à jour.
+    Le frein est rendu à l'IA : indispensable pour ralentir avant les virages
+    serrés. Le risque de politique « immobile/freinée » est désormais contenu par
+    une récompense dominée par la progression (delta*100) + IDLE_PENALTY.
     """
     a_long = max(-1.0, min(1.0, float(action[0])))
     a_steer = max(-1.0, min(1.0, float(action[1])))
-    throttle = 0.0 if reset else max(min_throttle, (a_long + 1.0) * 0.5)
     return {
-        "throttle": throttle,
-        "brake": 0.0,
+        "throttle": 0.0 if reset else max(0.0, a_long),
+        "brake": 0.0 if reset else max(0.0, -a_long),
         "steer": a_steer,
         "handbrake": False,
         "reset": reset,
@@ -230,6 +226,7 @@ async def start(websocket):
 
     local_buffer = RolloutBuffer()
     prev_progress = None
+    cum_progress = 0.0      # progression nette cumulée (robuste au bouclage / marche arrière)
     max_progress = 0.0
     stuck_steps = 0
 
@@ -265,8 +262,6 @@ async def start(websocket):
             off_track = bool(obs.get("offTrack", False))
             episode_end = bool(obs.get("episodeEnd", False))
 
-            max_progress = max(max_progress, progress)
-
             # --- Mode inférence (AI Player) ------------------------------------
             if conn_mode == "play":
                 state = extract_state(obs)
@@ -276,7 +271,11 @@ async def start(websocket):
 
             # --- Mode entraînement ---------------------------------------------
             if len(local_buffer.states) > len(local_buffer.rewards):
-                reward, _ = compute_reward(prev_progress, obs)
+                reward, delta = compute_reward(prev_progress, obs)
+                # Progression NETTE : un bouclage arrière (marche arrière au-delà
+                # de la ligne) donne un delta négatif, donc n'enfle pas le score.
+                cum_progress += delta
+                max_progress = max(max_progress, cum_progress)
 
                 if forward_speed < STUCK_SPEED:
                     stuck_steps += 1
@@ -293,6 +292,7 @@ async def start(websocket):
                     await send_action(websocket, action_to_control([0.0, 0.0], reset=True))
                     await end_episode(local_buffer, max_progress)
                     prev_progress = None
+                    cum_progress = 0.0
                     max_progress = 0.0
                     stuck_steps = 0
                     continue
@@ -300,7 +300,7 @@ async def start(websocket):
             state = extract_state(obs)
             action = agent.act_train(state, local_buffer)
             prev_progress = progress
-            await send_action(websocket, action_to_control(action, min_throttle=TRAINING_MIN_THROTTLE))
+            await send_action(websocket, action_to_control(action))
 
     except websockets.exceptions.ConnectionClosed:
         pass
@@ -347,7 +347,10 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        if training_init_applied and (scores_history or rewards_history):
+        # On sauvegarde dès qu'il y a des données, même si le jeu a déjà été fermé
+        # (fermer l'onglet remet training_init_applied à False, ce qui ne doit pas
+        # faire perdre l'historique de la session).
+        if scores_history or rewards_history:
             print("\nServer stopping. Saving weights and history.")
             save_weights(agent.policy, agent.optimizer, int(session_best_progress * 1000))
             save_history(scores_history, rewards_history)

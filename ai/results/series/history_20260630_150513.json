@@ -1,0 +1,96 @@
+{
+  "scores_history": [
+    {
+      "iteration": 9,
+      "avg_progress": 0.22430555555555554,
+      "best_progress": 0.384375
+    },
+    {
+      "iteration": 16,
+      "avg_progress": 0.34017857142857144,
+      "best_progress": 0.390625
+    },
+    {
+      "iteration": 22,
+      "avg_progress": 0.4375,
+      "best_progress": 1.0
+    },
+    {
+      "iteration": 27,
+      "avg_progress": 0.445625,
+      "best_progress": 1.0
+    },
+    {
+      "iteration": 33,
+      "avg_progress": 0.3666666666666667,
+      "best_progress": 1.0
+    },
+    {
+      "iteration": 38,
+      "avg_progress": 0.5856250000000001,
+      "best_progress": 1.0
+    },
+    {
+      "iteration": 42,
+      "avg_progress": 0.8453125,
+      "best_progress": 1.0
+    },
+    {
+      "iteration": 47,
+      "avg_progress": 0.714375,
+      "best_progress": 1.0
+    },
+    {
+      "iteration": 53,
+      "avg_progress": 0.6015625,
+      "best_progress": 1.0
+    }
+  ],
+  "rewards_history": [
+    {
+      "iteration": 9,
+      "avg_reward": -0.13896747975493595,
+      "best_reward": 1.2481097278594953
+    },
+    {
+      "iteration": 16,
+      "avg_reward": -0.10609559261708845,
+      "best_reward": 1.2483930797576914
+    },
+    {
+      "iteration": 22,
+      "avg_reward": -0.049560285877946794,
+      "best_reward": 30.917499999999997
+    },
+    {
+      "iteration": 27,
+      "avg_reward": -0.048479820697283404,
+      "best_reward": 29.98016336387395
+    },
+    {
+      "iteration": 33,
+      "avg_reward": -0.058702874198303286,
+      "best_reward": 24.667499999999997
+    },
+    {
+      "iteration": 38,
+      "avg_reward": 0.008278523853427614,
+      "best_reward": 24.667663363873956
+    },
+    {
+      "iteration": 42,
+      "avg_reward": 0.0751116937686064,
+      "best_reward": 30.91767118300497
+    },
+    {
+      "iteration": 47,
+      "avg_reward": 0.0454507782275188,
+      "best_reward": 24.667663363873956
+    },
+    {
+      "iteration": 53,
+      "avg_reward": 0.028611627469333135,
+      "best_reward": 24.667663363873956
+    }
+  ]
+}

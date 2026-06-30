@@ -122,7 +122,7 @@ IDLE_PENALTY = 0.5
 # Petit gradient de vitesse résiduel pour aider au démarrage. La progression
 # (delta*100) récompense déjà la vitesse dans la BONNE direction, donc ce terme
 # reste volontairement faible pour ne pas la dominer.
-SPEED_REWARD = 0.01
+SPEED_REWARD = 0.001
 # Petit coût de temps constant.
 TIME_PENALTY = 0.02
 # Pénalité par pas hors-piste (modérée : rester bloqué ne doit jamais être
