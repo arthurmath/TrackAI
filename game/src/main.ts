@@ -47,6 +47,8 @@ class App {
   private state: AppState = 'menu';
   private session: RaceSession | null = null;
   private resultsShown = false;
+  /** Affichage de la ligne centrale de debug (bascule avec la touche L). */
+  private showCenterline = false;
 
   private selectedVehicleId = DEFAULT_CAR_ID;
   private selectedTrackId = DEFAULT_TRACK_ID;
@@ -201,6 +203,7 @@ class App {
       { trainingMode: this.aiMode === 'training' },
     );
     this.menus.setProgress(1);
+    this.session.track.setCenterlineVisible(this.showCenterline);
 
     await nextFrame();
 
@@ -322,6 +325,10 @@ class App {
       if (this.aiMode !== 'training') this.camera.cycle();
     });
     this.input.on('toggleDebug', () => this.debug.toggle());
+    this.input.on('toggleCenterline', () => {
+      this.showCenterline = !this.showCenterline;
+      this.session?.track.setCenterlineVisible(this.showCenterline);
+    });
     // 'reset' est consommé par le HumanController/RaceSession.
   }
 

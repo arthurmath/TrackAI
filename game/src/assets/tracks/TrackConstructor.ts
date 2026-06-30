@@ -23,6 +23,8 @@ export interface BuiltTrack {
   spawn: VehicleSpawn;
   /** Progression [0..1] du point le plus proche sur la ligne centrale. */
   getProgress(point: THREE.Vector3): number;
+  /** Affiche/masque la visualisation de debug de la ligne centrale (touche L). */
+  setCenterlineVisible(visible: boolean): void;
   dispose(): void;
 }
 
@@ -258,6 +260,14 @@ export class TrackConstructor {
       }
     }
 
+    // --- Debug : ligne centrale (masquée par défaut, bascule avec la touche L) ---
+    const centerlineDebug = this.buildCenterlineDebug(curve, def.centerline);
+    centerlineDebug.visible = false;
+    group.add(centerlineDebug);
+    const setCenterlineVisible = (visible: boolean): void => {
+      centerlineDebug.visible = visible;
+    };
+
     this.scene.add(group);
 
     // Table de progression (recherche du plus proche échantillon).
@@ -295,7 +305,41 @@ export class TrackConstructor {
       this.world.removeRigidBody(trackBody);
     };
 
-    return { group, curve, length, spawn, getProgress, dispose };
+    return { group, curve, length, spawn, getProgress, setCenterlineVisible, dispose };
+  }
+
+  /**
+   * Construit la visualisation de debug de la ligne centrale : un tube fin qui
+   * suit la courbe + une sphère sur chaque point de contrôle. Surélevé au-dessus
+   * de la route pour rester visible. Sert à vérifier que le tracé est aligné
+   * avec la route d'un modèle GLB (touche L en jeu).
+   */
+  private buildCenterlineDebug(
+    curve: THREE.CatmullRomCurve3,
+    controlPoints: TrackDefinition['centerline'],
+  ): THREE.Group {
+    const debug = new THREE.Group();
+    debug.name = 'centerline-debug';
+
+    // Tube le long de la courbe (magenta vif), légèrement surélevé.
+    const tubeGeo = new THREE.TubeGeometry(curve, 400, 0.18, 6, true);
+    const tubeMat = new THREE.MeshBasicMaterial({ color: 0xff00ff, depthTest: false });
+    const tube = new THREE.Mesh(tubeGeo, tubeMat);
+    tube.position.y = 0.6;
+    tube.renderOrder = 999;
+    debug.add(tube);
+
+    // Sphères cyan sur chaque point de contrôle (avec leur index implicite par l'ordre).
+    const sphereGeo = new THREE.SphereGeometry(0.5, 10, 8);
+    const sphereMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, depthTest: false });
+    for (const p of controlPoints) {
+      const s = new THREE.Mesh(sphereGeo, sphereMat);
+      s.position.set(p.x, p.y + 0.6, p.z);
+      s.renderOrder = 999;
+      debug.add(s);
+    }
+
+    return debug;
   }
 
   private buildRoad(

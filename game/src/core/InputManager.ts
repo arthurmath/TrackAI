@@ -4,7 +4,12 @@
  * les actions ponctuelles (reset, pause, changement de caméra, debug).
  */
 
-export type ActionEvent = 'reset' | 'pause' | 'cycleCamera' | 'toggleDebug';
+export type ActionEvent =
+  | 'reset'
+  | 'pause'
+  | 'cycleCamera'
+  | 'toggleDebug'
+  | 'toggleCenterline';
 
 export class InputManager {
   private readonly pressed = new Set<string>();
@@ -82,6 +87,11 @@ export class InputManager {
     if (e.repeat) return;
     if (e.code === 'F3') {
       this.emit('toggleDebug');
+      return;
+    }
+    // 'L' bascule la ligne centrale même hors conduite (utile en mode entraînement/orbit).
+    if (e.code === 'KeyL') {
+      this.emit('toggleCenterline');
       return;
     }
     if (!this.enabled) return;
