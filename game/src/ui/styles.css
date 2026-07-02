@@ -753,3 +753,76 @@ body {
   font-weight: 800;
   letter-spacing: 1px;
 }
+
+/* ---------- Dashboard d'entraînement (live) ---------- */
+.training-dash {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  width: 360px;
+  padding: 14px 16px 12px;
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(6px);
+  z-index: 30;
+  pointer-events: none;
+}
+
+.training-dash h3 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.training-dash .td-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.training-dash .td-stat .v {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.training-dash .td-stat .k {
+  margin-top: 2px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.training-dash .td-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.training-dash .td-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent), #ffd27a);
+  transition: width 0.4s ease;
+}
+
+.training-dash .td-bar-label {
+  margin: 4px 0 8px;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.training-dash .td-chart {
+  width: 100%;
+  height: 150px;
+  display: block;
+}

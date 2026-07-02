@@ -77,6 +77,8 @@ export const AI_CONFIG = {
   websocketUrl: 'ws://localhost:8765',
   /** URL HTTP pour lister les checkpoints de poids sauvegardés. */
   weightsApiUrl: 'http://localhost:8765/weights',
+  /** URL HTTP des métriques d'entraînement en direct (dashboard live). */
+  metricsApiUrl: 'http://localhost:8765/metrics',
   /** URL pour démarrer le serveur Python (plugin Vite, dev uniquement). */
   serverStartUrl: '/api/ai-server/start',
   /** Liste des fichiers d'historique d'entraînement (plugin Vite, dev uniquement). */

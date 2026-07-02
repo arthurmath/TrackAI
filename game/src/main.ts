@@ -22,6 +22,7 @@ import { Menus } from './ui/Menus';
 import { HUD } from './ui/HUD';
 import { Countdown } from './ui/Countdown';
 import { DebugOverlay } from './ui/DebugOverlay';
+import { TrainingDashboard } from './ui/TrainingDashboard';
 import { CARS, getCarById, DEFAULT_CAR_ID } from './assets/cars';
 import { TRACKS, getTrackById, DEFAULT_TRACK_ID } from './assets/tracks';
 import { AI_CONFIG } from './config';
@@ -43,6 +44,7 @@ class App {
   private readonly hud: HUD;
   private readonly countdown: Countdown;
   private readonly debug: DebugOverlay;
+  private readonly trainingDash: TrainingDashboard;
 
   private state: AppState = 'menu';
   private session: RaceSession | null = null;
@@ -72,6 +74,7 @@ class App {
     this.hud = new HUD(this.uiRoot);
     this.countdown = new Countdown(this.uiRoot);
     this.debug = new DebugOverlay(this.uiRoot);
+    this.trainingDash = new TrainingDashboard(this.uiRoot);
 
     this.input = new InputManager();
     this.orbitCamera = new OrbitCameraController(this.scene.camera, canvas, this.input);
@@ -212,6 +215,7 @@ class App {
     this.hud.show();
     if (this.aiMode === 'training') {
       this.hud.showTrainingControls(() => this.stopTraining());
+      this.trainingDash.start();
       this.orbitCamera.activate(this.session.track.spawn.position);
     } else {
       this.orbitCamera.deactivate();
@@ -334,6 +338,7 @@ class App {
 
   private disposeSession(): void {
     this.orbitCamera.deactivate();
+    this.trainingDash.stop();
     if (this.session) {
       this.session.dispose(this.scene.scene);
       this.session = null;

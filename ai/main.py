@@ -360,14 +360,40 @@ async def start(websocket):
                 await end_episode(local_buffer, max_progress)
 
 
-async def process_request(connection, request):
-    """Expose la liste des poids via HTTP GET /weights (même port que le WebSocket)."""
-    if request.path != "/weights":
-        return None
-    response = connection.respond(200, json.dumps(list_saved_weights()))
+def _current_metrics():
+    """État courant de la session d'entraînement pour le dashboard live.
+    Ne renvoie que les 300 derniers points d'historique (courbe suffisante, payload
+    borné même sur une longue session)."""
+    return {
+        "connections": active_connections,
+        "trainings": train_count,
+        "iterations": iteration_count,
+        "bestProgress": session_best_progress,
+        "messagesReceived": messages_received,
+        "timestep": global_timestep_count,
+        "updateTimestep": UPDATE_TIMESTEP,
+        "stopRequested": stop_requested,
+        "scores": scores_history[-300:],
+        "rewards": rewards_history[-300:],
+    }
+
+
+def _json_response(connection, payload):
+    response = connection.respond(200, json.dumps(payload))
     response.headers["Content-Type"] = "application/json"
     response.headers["Access-Control-Allow-Origin"] = "*"
     return response
+
+
+async def process_request(connection, request):
+    """Expose des endpoints HTTP GET sur le même port que le WebSocket :
+    /weights (liste des checkpoints) et /metrics (métriques d'entraînement live)."""
+    path = request.path.split("?", 1)[0]
+    if path == "/weights":
+        return _json_response(connection, list_saved_weights())
+    if path == "/metrics":
+        return _json_response(connection, _current_metrics())
+    return None
 
 
 async def heartbeat():
