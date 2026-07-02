@@ -128,6 +128,11 @@ TIME_PENALTY = 0.02
 # Pénalité par pas hors-piste (modérée : rester bloqué ne doit jamais être
 # "plus sûr" que d'avancer).
 OFFTRACK_PENALTY = 1.0
+# Pénalité par pas en marche arrière (forward_speed < 0). Combinée au fait que
+# reculer donne un delta négatif ET tombe désormais sous IDLE_PENALTY, ça rend la
+# marche arrière clairement dominée par la marche avant (évite que la politique s'y
+# installe depuis un biais initial défavorable).
+REVERSE_PENALTY = 0.5
 
 
 def compute_reward(prev_progress, obs):
@@ -151,12 +156,16 @@ def compute_reward(prev_progress, obs):
     forward_speed = float(obs.get("forwardSpeed", 0.0))
 
     reward = delta * 100.0
-    # Récompense (ou pénalité en marche arrière) proportionnelle à la vitesse.
-    reward += forward_speed * SPEED_REWARD
+    # Récompense de vitesse UNIQUEMENT vers l'avant (reculer ne doit rien rapporter).
+    reward += max(0.0, forward_speed) * SPEED_REWARD
     reward -= TIME_PENALTY
-    # Pénalité supplémentaire tant que la voiture reste quasi immobile.
-    if abs(forward_speed) < IDLE_SPEED:
+    # Immobilité : on compare la vitesse SIGNÉE (pas abs). Reculer n'est donc pas
+    # considéré comme "bouger" et tombe aussi sous cette pénalité.
+    if forward_speed < IDLE_SPEED:
         reward -= IDLE_PENALTY
+    # Malus explicite de marche arrière.
+    if forward_speed < 0.0:
+        reward -= REVERSE_PENALTY
     if obs.get("offTrack", False):
         reward -= OFFTRACK_PENALTY
     return reward, delta

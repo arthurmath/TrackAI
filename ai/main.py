@@ -66,6 +66,9 @@ connection_lock = asyncio.Lock()
 training_init_applied = False
 training_init_lock = asyncio.Lock()
 
+# --- Diagnostic (heartbeat) : compteur d'observations reçues, tous agents confondus.
+messages_received = 0
+
 
 def action_to_control(action, reset=False):
     """Convertit le vecteur d'action continu en ControlState attendu par le jeu.
@@ -86,10 +89,6 @@ def action_to_control(action, reset=False):
         "handbrake": False,
         "reset": reset,
     }
-
-
-async def send_action(websocket, control):
-    await websocket.send(json.dumps({"type": "action", "data": control}))
 
 
 async def reset_training_counters():
@@ -161,14 +160,25 @@ async def handle_stop_training():
 
 
 async def perform_training():
-    global train_count, global_timestep_count
-    if len(global_buffer.states) == 0:
-        return
-    print(f"\nTraining PPO (buffer size: {len(global_buffer.states)})")
-    mean_reward = sum(global_buffer.rewards) / len(global_buffer.rewards)
-    best_reward = max(global_buffer.rewards)
+    global train_count, global_timestep_count, global_buffer
 
-    await agent.train(global_buffer)
+    # Détache le buffer courant sous verrou : l'entraînement (qui tourne désormais
+    # dans un thread, cf. Agent.train) travaille sur cet instantané privé pendant
+    # que les nouvelles expériences s'accumulent dans un buffer neuf. Sans ce swap,
+    # un autre agent pourrait faire extend() en plein torch.stack() (course de
+    # données). Bonus : évite les entraînements multiples redondants.
+    async with history_lock:
+        if len(global_buffer.states) == 0:
+            return
+        training_buffer = global_buffer
+        global_buffer = RolloutBuffer()
+        global_timestep_count = 0
+
+    print(f"\nTraining PPO (buffer size: {len(training_buffer.states)})")
+    mean_reward = sum(training_buffer.rewards) / len(training_buffer.rewards)
+    best_reward = max(training_buffer.rewards)
+
+    await agent.train(training_buffer)
 
     async with history_lock:
         train_count += 1
@@ -184,7 +194,6 @@ async def perform_training():
             "best_reward": best_reward,
         })
         episode_progress.clear()
-        global_timestep_count = 0
 
     print(f"Training complete. Total trainings: {train_count}, "
           f"avg progress: {avg_progress:.3f}, best: {session_best_progress:.3f}")
@@ -218,6 +227,7 @@ async def end_episode(local_buffer, max_progress):
 async def start(websocket):
     """Une connexion = une voiture IA. Mode play ou train selon le message d'init."""
     global active_connections, stop_requested, training_init_applied
+    global messages_received
 
     conn_mode = None  # "play" | "train"
 
@@ -229,6 +239,34 @@ async def start(websocket):
     cum_progress = 0.0      # progression nette cumulée (robuste au bouclage / marche arrière)
     max_progress = 0.0
     stuck_steps = 0
+
+    # Boîte à une seule case + tâche d'envoi dédiée. La boucle de lecture DÉPOSE la
+    # dernière action (queue_action, non bloquant) et repart lire aussitôt, au lieu
+    # d'attendre la fin de l'envoi. Sépare lecture et écriture -> supprime
+    # l'interblocage full-duplex : si le navigateur prend du retard, seule cette
+    # tâche patiente, et les actions périmées sont écrasées (seule la plus récente
+    # compte pour piloter la voiture).
+    pending_action = None
+    action_ready = asyncio.Event()
+
+    async def sender():
+        nonlocal pending_action
+        try:
+            while True:
+                await action_ready.wait()
+                action_ready.clear()
+                msg, pending_action = pending_action, None
+                if msg is not None:
+                    await websocket.send(msg)
+        except websockets.exceptions.ConnectionClosed:
+            pass
+
+    def queue_action(control):
+        nonlocal pending_action
+        pending_action = json.dumps({"type": "action", "data": control})
+        action_ready.set()
+
+    sender_task = asyncio.create_task(sender())
 
     try:
         async for message in websocket:
@@ -256,6 +294,7 @@ async def start(websocket):
                 continue
             if msg.get("type") != "observation":
                 continue
+            messages_received += 1
             obs = msg.get("data", {})
             progress = float(obs.get("trackProgress", 0.0))
             forward_speed = abs(float(obs.get("forwardSpeed", 0.0)))
@@ -266,7 +305,7 @@ async def start(websocket):
             if conn_mode == "play":
                 state = extract_state(obs)
                 action, _ = agent.act_play(state)
-                await send_action(websocket, action_to_control(action))
+                queue_action(action_to_control(action))
                 continue
 
             # --- Mode entraînement ---------------------------------------------
@@ -289,7 +328,7 @@ async def start(websocket):
                 local_buffer.is_terminals.append(done)
 
                 if done:
-                    await send_action(websocket, action_to_control([0.0, 0.0], reset=True))
+                    queue_action(action_to_control([0.0, 0.0], reset=True))
                     await end_episode(local_buffer, max_progress)
                     prev_progress = None
                     cum_progress = 0.0
@@ -300,11 +339,12 @@ async def start(websocket):
             state = extract_state(obs)
             action = agent.act_train(state, local_buffer)
             prev_progress = progress
-            await send_action(websocket, action_to_control(action))
+            queue_action(action_to_control(action))
 
     except websockets.exceptions.ConnectionClosed:
         pass
     finally:
+        sender_task.cancel()
         async with connection_lock:
             active_connections -= 1
             if active_connections == 0:
@@ -330,9 +370,23 @@ async def process_request(connection, request):
     return response
 
 
+async def heartbeat():
+    """Diagnostic : bat toutes les 2 s. S'il continue à imprimer pendant un gel,
+    la boucle asyncio est vivante (problème côté réception/sockets) ; s'il s'arrête,
+    la boucle elle-même est bloquée. recv/s = débit d'observations réellement reçues."""
+    last = 0
+    while True:
+        await asyncio.sleep(2)
+        rate = (messages_received - last) / 2
+        last = messages_received
+        print(f"[HB] conns={active_connections} recv/s={rate:.0f} total={messages_received} "
+              f"ts={global_timestep_count} trains={train_count} stop={stop_requested}")
+
+
 async def main():
     print(f"\nStarting Websocket server on ws://127.0.0.1:{PORT}\n")
 
+    hb_task = asyncio.create_task(heartbeat())
     stop = asyncio.Future()
     try:
         async with websockets.serve(
@@ -348,6 +402,8 @@ async def main():
             await stop
     except websockets.exceptions.ConnectionClosed:
         pass
+    finally:
+        hb_task.cancel()
 
 
 if __name__ == "__main__":

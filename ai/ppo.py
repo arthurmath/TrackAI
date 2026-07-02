@@ -1,5 +1,6 @@
 import math
 import asyncio
+import threading
 import torch
 import torch.nn as nn
 from torch.distributions import Normal
@@ -100,6 +101,10 @@ class Agent:
 
         # Évite que des mises à jour simultanées (plusieurs agents) ne se chevauchent.
         self.update_lock = asyncio.Lock()
+        # Protège policy_old entre le thread d'entraînement (qui la met à jour à la
+        # fin via load_state_dict) et la boucle asyncio (qui la lit dans act_train /
+        # act_play). threading.Lock car les deux accès sont sur des threads différents.
+        self._policy_lock = threading.Lock()
 
     def reinitialize(self):
         """Réinitialise aléatoirement les poids et l'optimiseur (cold start)."""
@@ -117,19 +122,23 @@ class Agent:
         ])
         print("\n\nCold start: neural network weights reinitialized.")
 
-    def act_play(self, state): 
+    def act_play(self, state):
         """Action déterministe (moyenne) pour l'inférence/démo."""
         with torch.no_grad():
             state_t = torch.FloatTensor(state).to(device)
-            mean = self.policy_old.actor(state_t)
-            state_val = self.policy_old.critic(state_t)
+            with self._policy_lock:
+                mean = self.policy_old.actor(state_t)
+                state_val = self.policy_old.critic(state_t)
         return mean.tolist(), state_val.item()
 
     def act_train(self, state, buffer):
         """Échantillonne une action et la stocke dans le buffer."""
         with torch.no_grad():
             state_t = torch.FloatTensor(state).to(device)
-            action, action_logprob, state_val = self.policy_old.act(state_t)
+            # Verrou : évite une lecture de policy_old pendant que le thread
+            # d'entraînement la remplace (load_state_dict). Non contendu 99 % du temps.
+            with self._policy_lock:
+                action, action_logprob, state_val = self.policy_old.act(state_t)
 
         buffer.states.append(state_t)
         buffer.actions.append(action)
@@ -142,56 +151,71 @@ class Agent:
         async with self.update_lock:
             if len(buffer.states) == 0:
                 return
+            # Le calcul PyTorch est du travail synchrone lourd (~100-300 ms). On le
+            # sort de la boucle asyncio via un thread pour qu'elle continue à lire et
+            # servir les WebSockets pendant l'entraînement : sans ça, la file d'envoi
+            # du navigateur s'engorge et l'entraînement finit par se figer.
+            # update_lock (asyncio) garantit qu'un seul _train_sync tourne à la fois.
+            await asyncio.to_thread(self._train_sync, buffer)
 
-            old_states, old_actions, old_logprobs, old_state_values = format(buffer)
+    def _train_sync(self, buffer):
+        """Cœur PPO synchrone, exécuté dans un thread (cf. train).
 
-            # GAE (Generalized Advantage Estimation)
-            values_list = old_state_values.detach().cpu().tolist()
-            advantages_list = [0.0] * len(buffer.rewards)
-            gae = 0.0
-            for i in reversed(range(len(buffer.rewards))):
-                is_terminal = buffer.is_terminals[i]
-                next_value = 0.0 if (is_terminal or i == len(buffer.rewards) - 1) else values_list[i + 1]
-                delta = buffer.rewards[i] + self.gamma * next_value - values_list[i]
-                gae = delta + self.gamma * self.gae_lambda * (0.0 if is_terminal else gae)
-                advantages_list[i] = gae
+        `buffer` doit être un instantané détaché : aucune autre coroutine ne doit
+        le modifier pendant l'exécution (garanti par le swap dans perform_training).
+        """
+        old_states, old_actions, old_logprobs, old_state_values = format(buffer)
 
-            advantages = torch.tensor(advantages_list, dtype=torch.float32, device=device)
-            returns = advantages + old_state_values.detach()
+        # GAE (Generalized Advantage Estimation)
+        values_list = old_state_values.detach().cpu().tolist()
+        advantages_list = [0.0] * len(buffer.rewards)
+        gae = 0.0
+        for i in reversed(range(len(buffer.rewards))):
+            is_terminal = buffer.is_terminals[i]
+            next_value = 0.0 if (is_terminal or i == len(buffer.rewards) - 1) else values_list[i + 1]
+            delta = buffer.rewards[i] + self.gamma * next_value - values_list[i]
+            gae = delta + self.gamma * self.gae_lambda * (0.0 if is_terminal else gae)
+            advantages_list[i] = gae
 
-            if len(advantages) > 1:
-                advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+        advantages = torch.tensor(advantages_list, dtype=torch.float32, device=device)
+        returns = advantages + old_state_values.detach()
 
-            n_samples = len(old_states)
-            batch_size = min(self.batch_size, n_samples)
+        if len(advantages) > 1:
+            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
-            for _ in range(self.epochs):
-                indices = torch.randperm(n_samples, device=device)
-                for start in range(0, n_samples, batch_size):
-                    idx = indices[start:start + batch_size]
-                    mb_states = old_states[idx]
-                    mb_actions = old_actions[idx]
-                    mb_logprobs = old_logprobs[idx]
-                    mb_advantages = advantages[idx]
-                    mb_returns = returns[idx]
+        n_samples = len(old_states)
+        batch_size = min(self.batch_size, n_samples)
 
-                    logprobs, state_values, dist_entropy = self.policy.evaluate(mb_states, mb_actions)
-                    state_values = torch.squeeze(state_values)
-                    if state_values.dim() == 0:
-                        state_values = state_values.unsqueeze(0)
+        for _ in range(self.epochs):
+            indices = torch.randperm(n_samples, device=device)
+            for start in range(0, n_samples, batch_size):
+                idx = indices[start:start + batch_size]
+                mb_states = old_states[idx]
+                mb_actions = old_actions[idx]
+                mb_logprobs = old_logprobs[idx]
+                mb_advantages = advantages[idx]
+                mb_returns = returns[idx]
 
-                    ratios = torch.exp(logprobs - mb_logprobs.detach())
+                logprobs, state_values, dist_entropy = self.policy.evaluate(mb_states, mb_actions)
+                state_values = torch.squeeze(state_values)
+                if state_values.dim() == 0:
+                    state_values = state_values.unsqueeze(0)
 
-                    surr1 = ratios * mb_advantages
-                    surr2 = torch.clamp(ratios, 1 - self.eps, 1 + self.eps) * mb_advantages
+                ratios = torch.exp(logprobs - mb_logprobs.detach())
 
-                    loss = -torch.min(surr1, surr2) + self.c1 * self.loss(state_values, mb_returns) - self.c2 * dist_entropy
+                surr1 = ratios * mb_advantages
+                surr2 = torch.clamp(ratios, 1 - self.eps, 1 + self.eps) * mb_advantages
 
-                    self.optimizer.zero_grad()
-                    loss.mean().backward()
-                    torch.nn.utils.clip_grad_norm_(self.policy.parameters(), 0.5)
-                    self.optimizer.step()
-                    self.policy.clamp_action_std_min()
+                loss = -torch.min(surr1, surr2) + self.c1 * self.loss(state_values, mb_returns) - self.c2 * dist_entropy
 
+                self.optimizer.zero_grad()
+                loss.mean().backward()
+                torch.nn.utils.clip_grad_norm_(self.policy.parameters(), 0.5)
+                self.optimizer.step()
+                self.policy.clamp_action_std_min()
+
+        # Publication des nouveaux poids : sous verrou pour ne pas être lu à moitié
+        # par act_train / act_play qui tournent sur la boucle asyncio.
+        with self._policy_lock:
             self.policy_old.load_state_dict(self.policy.state_dict())
-            buffer.clear()
+        buffer.clear()

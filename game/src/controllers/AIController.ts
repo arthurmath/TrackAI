@@ -20,8 +20,37 @@ export type AIInit =
 /** @deprecated Use AIInit */
 export type TrainingInit = Extract<AIInit, { kind: 'training' }>;
 
+/**
+ * Seuil de backpressure : si la file d'envoi WebSocket du navigateur
+ * (`bufferedAmount`) dépasse cette taille, on cesse d'empiler des observations.
+ * ~64 Ko laisse passer une petite rafale (le serveur Python peut prendre du
+ * retard le temps d'un entraînement) tout en bornant strictement la mémoire.
+ */
+const MAX_BUFFERED_BYTES = 64 * 1024;
+
 export class AIController implements Controller {
   readonly kind = 'ai' as const;
+
+  // --- Diagnostic agrégé (toutes les voitures) : imprime 1×/s.
+  // calls/s : appels à pushObservation (prouve que la boucle de jeu tourne).
+  // sent/s  : observations réellement envoyées. skipBuf/s : sautées (backpressure).
+  // maxBuf  : plus grand bufferedAmount vu (si énorme → tuyau bouché).
+  private static diagCalls = 0;
+  private static diagSent = 0;
+  private static diagSkipBuf = 0;
+  private static diagMaxBuf = 0;
+  private static diagTimer: number | null = null;
+  private static startDiag(): void {
+    if (AIController.diagTimer !== null) return;
+    AIController.diagTimer = window.setInterval(() => {
+      console.log(`[AIdiag] calls/s=${AIController.diagCalls} sent/s=${AIController.diagSent} `
+        + `skipBuf/s=${AIController.diagSkipBuf} maxBuf=${AIController.diagMaxBuf}`);
+      AIController.diagCalls = 0;
+      AIController.diagSent = 0;
+      AIController.diagSkipBuf = 0;
+      AIController.diagMaxBuf = 0;
+    }, 1000);
+  }
 
   private socket: WebSocket | null = null;
   private latestAction: ControlState = { ...NEUTRAL_CONTROL };
@@ -34,6 +63,7 @@ export class AIController implements Controller {
     private readonly init?: AIInit,
     private readonly sendInit = false,
   ) {
+    AIController.startDiag();
     this.connect();
   }
 
@@ -63,12 +93,15 @@ export class AIController implements Controller {
         }
       }
     });
-    this.socket.addEventListener('close', () => {
+    this.socket.addEventListener('close', (ev) => {
       this.connected = false;
       this.latestAction = { ...NEUTRAL_CONTROL };
+      // Diagnostic : on veut savoir si les sockets meurent au moment d'un gel.
+      console.warn(`[AIController] Connexion fermée (code=${ev.code}, propre=${ev.wasClean}, raison="${ev.reason}")`);
     });
     this.socket.addEventListener('error', () => {
       this.connected = false;
+      console.warn('[AIController] Erreur socket');
     });
     this.socket.addEventListener('message', (ev) => this.onMessage(ev));
   }
@@ -92,16 +125,27 @@ export class AIController implements Controller {
   }
 
   pushObservation(obs: VehicleObservation): boolean {
+    AIController.diagCalls++;
     if (!this.connected || !this.socket) return false;
+    if (this.socket.readyState !== WebSocket.OPEN) return false;
     const now = performance.now();
     const minInterval = 1000 / this.stateSendRate;
     if (now - this.lastSendTime < minInterval) return false;
-    this.lastSendTime = now;
-    if (this.socket.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify({ type: 'observation', data: obs }));
-      return true;
+    const buffered = this.socket.bufferedAmount;
+    if (buffered > AIController.diagMaxBuf) AIController.diagMaxBuf = buffered;
+    // Backpressure : si le serveur Python n'absorbe pas les observations assez
+    // vite, la file d'envoi du navigateur (bufferedAmount) grossit sans limite,
+    // engorge le tuyau TCP et finit par geler l'entraînement. Plutôt que d'empiler,
+    // on saute l'observation quand la file dépasse le seuil : perdre quelques
+    // observations est sans impact sur l'apprentissage, un tuyau bouché est fatal.
+    if (buffered > MAX_BUFFERED_BYTES) {
+      AIController.diagSkipBuf++;
+      return false;
     }
-    return false;
+    this.lastSendTime = now;
+    this.socket.send(JSON.stringify({ type: 'observation', data: obs }));
+    AIController.diagSent++;
+    return true;
   }
 
   sample(): ControlState {
@@ -123,9 +167,14 @@ export class AIController implements Controller {
   }
 }
 
+// NB: Math.min/max laissent passer NaN (Math.max(-1, NaN) === NaN). Un NaN qui
+// atteindrait la physique corromprait Rapier (panique WASM → gel). On mappe donc
+// tout non-fini vers 0 (action neutre).
 function clamp01(v: number): number {
+  if (!Number.isFinite(v)) return 0;
   return Math.max(0, Math.min(1, v));
 }
 function clampSigned(v: number): number {
+  if (!Number.isFinite(v)) return 0;
   return Math.max(-1, Math.min(1, v));
 }

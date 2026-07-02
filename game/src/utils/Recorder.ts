@@ -47,6 +47,11 @@ export class Recorder {
     private readonly trackId: string,
     private readonly vehicleId: string,
     totalLaps = RACE_CONFIG.totalLaps,
+    // Entraînement : course SANS FIN. Sinon, quand l'agent principal boucle ses
+    // totalLaps, la course passe à 'finished', isRacing devient false, allowControl
+    // tombe et TOUTES les voitures cessent d'être pilotées/observées → l'entraînement
+    // se fige définitivement (les voitures partent au frein à main).
+    private readonly endless = false,
   ) {
     this.totalLaps = totalLaps;
     this.countdownRemaining = RACE_CONFIG.countdownSeconds;
@@ -113,7 +118,7 @@ export class Recorder {
     this.lastLapMs = lapMs;
     this.lapTimesMs.push(lapMs);
     this.lapsCompleted++;
-    if (this.lapsCompleted >= this.totalLaps) {
+    if (!this.endless && this.lapsCompleted >= this.totalLaps) {
       this.finish();
     }
   }

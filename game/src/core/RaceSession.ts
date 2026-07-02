@@ -63,6 +63,9 @@ export class RaceSession {
   private readonly _aim = new THREE.Vector3();
   // Longueur totale de la courbe centrale (m), calculée à la demande puis mise en cache.
   private _curveLength = 0;
+  // Passe à true si un pas physique lève une exception (état Rapier corrompu).
+  // Évite de spammer la console et permet de détecter le blocage.
+  private physicsStepFailed = false;
 
   /**
    * Factory asynchrone : construit le monde physique, le circuit (chargement GLB
@@ -139,8 +142,10 @@ export class RaceSession {
       return agent;
     });
 
-    // Recorder/HUD suivent l'agent principal (index 0).
-    this.race = new Recorder(trackDef.id, vehicleConfig.id);
+    // Recorder/HUD suivent l'agent principal (index 0). En entraînement, la course
+    // est sans fin (endless) : sinon isRacing tomberait à la fin des 3 tours et
+    // figerait tout l'entraînement.
+    this.race = new Recorder(trackDef.id, vehicleConfig.id, undefined, this.trainingMode);
     this.lighting.apply(trackDef.lighting);
   }
 
@@ -175,7 +180,17 @@ export class RaceSession {
     }
 
     // 2) Un seul pas physique pour tout le monde.
-    this.physics.step();
+    // Protégé : si l'état Rapier se corrompt (NaN → panique WASM), l'exception ne
+    // doit PAS interrompre fixedUpdate à chaque frame (ce qui stopperait l'envoi
+    // des observations et figerait l'entraînement). On loggue une seule fois.
+    try {
+      this.physics.step();
+    } catch (err) {
+      if (!this.physicsStepFailed) {
+        this.physicsStepFailed = true;
+        console.error('[RaceSession] ⚠️ physics.step() a levé une exception — état physique corrompu (NaN ?). Le monde Rapier est probablement mort.', err);
+      }
+    }
 
     // 3) Mise à jour par agent : buffers, progression, respawn auto, observation.
     for (let i = 0; i < this.agents.length; i++) {

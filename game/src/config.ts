@@ -90,7 +90,7 @@ export const AI_CONFIG = {
    * Chacune ouvre sa propre connexion WebSocket ; le serveur Python agrège
    * leur expérience dans un buffer global partagé. En inférence, une seule.
    */
-  trainingCars: 20,
+  trainingCars: 50,
   /** Respawn au départ si la voiture ne progresse plus (entraînement). */
   trainingStuckSeconds: 2.0,
   /** Vitesse minimale (m/s) considérée comme du mouvement. */
