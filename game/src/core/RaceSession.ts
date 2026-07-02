@@ -152,17 +152,25 @@ export class RaceSession {
   /** Pas fixe de simulation. allowControl=false pendant le compte à rebours. */
   fixedUpdate(dt: number, allowControl: boolean): void {
     // 1) Applique les contrôles de chaque agent AVANT le pas physique unique.
-    for (const agent of this.agents) {
-      const control = agent.controller.sample();
+    // Chaque agent est isolé dans un try/catch : une exception sur une voiture
+    // (état physique NaN, contrôleur défaillant…) ne doit plus figer toute la
+    // boucle de jeu (chrono + rendu + 50 voitures). L'erreur est loggée.
+    for (let i = 0; i < this.agents.length; i++) {
+      const agent = this.agents[i];
+      try {
+        const control = agent.controller.sample();
 
-      if (control.reset) {
-        this.respawnAgent(agent);
-      }
+        if (control.reset) {
+          this.respawnAgent(agent);
+        }
 
-      if (allowControl) {
-        agent.vehicle.update(control, dt);
-      } else {
-        agent.vehicle.update({ throttle: 0, brake: 0, steer: 0, handbrake: true, reset: false }, dt);
+        if (allowControl) {
+          agent.vehicle.update(control, dt);
+        } else {
+          agent.vehicle.update({ throttle: 0, brake: 0, steer: 0, handbrake: true, reset: false }, dt);
+        }
+      } catch (err) {
+        console.error(`[RaceSession] Erreur (contrôle) sur l'agent ${i} :`, err);
       }
     }
 
@@ -173,44 +181,50 @@ export class RaceSession {
     for (let i = 0; i < this.agents.length; i++) {
       const agent = this.agents[i];
 
-      agent.prevPos.copy(agent.currPos);
-      agent.prevQuat.copy(agent.currQuat);
-      agent.vehicle.getChassisTransform(agent.currPos, agent.currQuat);
+      // Même isolation que la boucle 1 : une exception sur un agent (progression
+      // NaN, capteurs, observation…) ne doit pas interrompre la frame entière.
+      try {
+        agent.prevPos.copy(agent.currPos);
+        agent.prevQuat.copy(agent.currQuat);
+        agent.vehicle.getChassisTransform(agent.currPos, agent.currQuat);
 
-      let progress = this.track.getProgress(agent.currPos);
+        let progress = this.track.getProgress(agent.currPos);
 
-      // Le recorder ne suit que l'agent principal.
-      if (i === 0) {
-        this.race.update(dt, progress);
-      }
+        // Le recorder ne suit que l'agent principal.
+        if (i === 0) {
+          this.race.update(dt, progress);
+        }
 
-      // Respawn auto si retournée trop longtemps ou tombée sous la map.
-      if (agent.vehicle.isFlipped() && agent.vehicle.speedKmh < 5) {
-        agent.flippedTimer += dt;
-      } else {
-        agent.flippedTimer = 0;
-      }
-      const flipTimeout = this.trainingMode ? 1.5 : 2.5;
-      if (agent.flippedTimer > flipTimeout || agent.currPos.y < -10) {
-        this.respawnAgent(agent);
-        progress = this.track.getProgress(agent.currPos);
-        if (this.trainingMode) {
+        // Respawn auto si retournée trop longtemps ou tombée sous la map.
+        if (agent.vehicle.isFlipped() && agent.vehicle.speedKmh < 5) {
+          agent.flippedTimer += dt;
+        } else {
+          agent.flippedTimer = 0;
+        }
+        const flipTimeout = this.trainingMode ? 1.5 : 2.5;
+        if (agent.flippedTimer > flipTimeout || agent.currPos.y < -10) {
+          this.respawnAgent(agent);
+          progress = this.track.getProgress(agent.currPos);
+          if (this.trainingMode) {
+            agent.episodeEnd = true;
+          }
+        }
+
+        // En entraînement : respawn au départ si immobile trop longtemps.
+        if (this.trainingMode && allowControl && this.updateStuck(agent, dt)) {
+          this.respawnAgent(agent);
+          progress = this.track.getProgress(agent.currPos);
           agent.episodeEnd = true;
         }
-      }
 
-      // En entraînement : respawn au départ si immobile trop longtemps.
-      if (this.trainingMode && allowControl && this.updateStuck(agent, dt)) {
-        this.respawnAgent(agent);
-        progress = this.track.getProgress(agent.currPos);
-        agent.episodeEnd = true;
-      }
-
-      // Observation pour l'IA (si applicable). On n'envoie que pendant la phase
-      // pilotable : les frames du compte à rebours fausseraient l'apprentissage.
-      if (allowControl && agent.controller.pushObservation) {
-        const sent = agent.controller.pushObservation(this.buildObservation(agent, progress));
-        if (sent) agent.episodeEnd = false;
+        // Observation pour l'IA (si applicable). On n'envoie que pendant la phase
+        // pilotable : les frames du compte à rebours fausseraient l'apprentissage.
+        if (allowControl && agent.controller.pushObservation) {
+          const sent = agent.controller.pushObservation(this.buildObservation(agent, progress));
+          if (sent) agent.episodeEnd = false;
+        }
+      } catch (err) {
+        console.error(`[RaceSession] Erreur (mise à jour) sur l'agent ${i} :`, err);
       }
     }
   }

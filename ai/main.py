@@ -337,6 +337,13 @@ async def main():
     try:
         async with websockets.serve(
             start, "127.0.0.1", PORT, process_request=process_request,
+            # Keepalive désactivé : un onglet de navigateur en arrière-plan est
+            # gelé par le navigateur (requestAnimationFrame suspendu, plus de
+            # pong) ; avec le ping par défaut (20 s) le serveur couperait alors
+            # la connexion et l'entraînement ne reprendrait jamais. Sans ping,
+            # la socket survit à la mise en pause et reprend au retour au premier
+            # plan.
+            ping_interval=None,
         ):
             await stop
     except websockets.exceptions.ConnectionClosed:
