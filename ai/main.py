@@ -1,4 +1,5 @@
 import os
+import time
 import json
 import asyncio
 import logging
@@ -68,6 +69,9 @@ training_init_lock = asyncio.Lock()
 
 # --- Diagnostic (heartbeat) : compteur d'observations reçues, tous agents confondus.
 messages_received = 0
+# Meilleur temps au tour (ms) de la session : plus petit temps d'un tour PROPRE
+# (bouclé sans crash/respawn). None tant qu'aucun tour complet n'a été réalisé.
+best_lap_ms = None
 
 
 def action_to_control(action, reset=False):
@@ -96,6 +100,7 @@ async def reset_training_counters():
     global train_count, global_timestep_count, iteration_count
     global session_best_progress, stop_requested
     global scores_history, rewards_history, episode_progress
+    global best_lap_ms
 
     async with history_lock:
         train_count = 0
@@ -105,6 +110,7 @@ async def reset_training_counters():
         scores_history = []
         rewards_history = []
         episode_progress = []
+        best_lap_ms = None
         global_buffer.clear()
     async with stop_save_lock:
         stop_requested = False
@@ -227,7 +233,7 @@ async def end_episode(local_buffer, max_progress):
 async def start(websocket):
     """Une connexion = une voiture IA. Mode play ou train selon le message d'init."""
     global active_connections, stop_requested, training_init_applied
-    global messages_received
+    global messages_received, best_lap_ms
 
     conn_mode = None  # "play" | "train"
 
@@ -239,6 +245,8 @@ async def start(websocket):
     cum_progress = 0.0      # progression nette cumulée (robuste au bouclage / marche arrière)
     max_progress = 0.0
     stuck_steps = 0
+    lap_start_t = None      # début du tour courant (time.monotonic), pour le chrono
+    laps_counted = 0        # nombre de tours complets déjà chronométrés cet épisode
 
     # Boîte à une seule case + tâche d'envoi dédiée. La boucle de lecture DÉPOSE la
     # dernière action (queue_action, non bloquant) et repart lire aussitôt, au lieu
@@ -316,6 +324,20 @@ async def start(websocket):
                 cum_progress += delta
                 max_progress = max(max_progress, cum_progress)
 
+                # Chrono de tour PROPRE : temps entre deux franchissements de ligne
+                # (cum_progress qui passe un entier) DANS le même épisode. Un crash
+                # ou un respawn termine l'épisode (done) et remet le chrono à zéro,
+                # donc seul un tour bouclé sans incident est mesuré.
+                now_t = time.monotonic()
+                if lap_start_t is None:
+                    lap_start_t = now_t
+                if int(cum_progress) > laps_counted:
+                    lap_ms = (now_t - lap_start_t) * 1000.0
+                    laps_counted = int(cum_progress)
+                    lap_start_t = now_t
+                    if best_lap_ms is None or lap_ms < best_lap_ms:
+                        best_lap_ms = lap_ms
+
                 if forward_speed < STUCK_SPEED:
                     stuck_steps += 1
                 else:
@@ -334,6 +356,8 @@ async def start(websocket):
                     cum_progress = 0.0
                     max_progress = 0.0
                     stuck_steps = 0
+                    lap_start_t = None
+                    laps_counted = 0
                     continue
 
             state = extract_state(obs)
@@ -373,6 +397,7 @@ def _current_metrics():
         "timestep": global_timestep_count,
         "updateTimestep": UPDATE_TIMESTEP,
         "stopRequested": stop_requested,
+        "bestLapMs": best_lap_ms,
         "scores": scores_history[-300:],
         "rewards": rewards_history[-300:],
     }

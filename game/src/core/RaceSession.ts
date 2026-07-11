@@ -24,6 +24,9 @@ const SENSOR_MAX = 50;
 // Distances (m) des points de visée échantillonnés DEVANT la voiture sur la
 // courbe centrale, pour donner à l'IA l'anticipation des virages.
 const LOOKAHEAD_DISTANCES = [10, 25];
+// Distances (m) auxquelles on mesure la courbure signée du tracé (proche, loin),
+// pour que l'IA anticipe la SÉVÉRITÉ d'un virage et freine avant.
+const CURVATURE_DISTANCES = [15, 35];
 
 /** Un véhicule piloté dans la session : physique, vue, contrôleur, buffers. */
 interface SessionAgent {
@@ -61,6 +64,9 @@ export class RaceSession {
   private readonly _fwd = new THREE.Vector3();
   private readonly _ray = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 1 });
   private readonly _aim = new THREE.Vector3();
+  // Tangentes de la courbe centrale (courbure), réutilisées pour éviter les allocations.
+  private readonly _t0 = new THREE.Vector3();
+  private readonly _t1 = new THREE.Vector3();
   // Longueur totale de la courbe centrale (m), calculée à la demande puis mise en cache.
   private _curveLength = 0;
   // Passe à true si un pas physique lève une exception (état Rapier corrompu).
@@ -285,6 +291,7 @@ export class RaceSession {
     const dist = Math.hypot(onCurve.x - t.x, onCurve.z - t.z);
     const offTrack = dist > this.trackDef.roadWidth * 0.6 || agent.vehicle.isFlipped();
     const lookahead = this.castLookahead(agent, progress);
+    const curvature = this.castCurvature(progress);
 
     return {
       position: [t.x, t.y, t.z],
@@ -295,6 +302,7 @@ export class RaceSession {
       trackProgress: progress,
       offTrack,
       lookahead,
+      curvature,
       episodeEnd: agent.episodeEnd || undefined,
     };
   }
@@ -329,6 +337,27 @@ export class RaceSession {
       const localFwd = dx * fwdX + dz * fwdZ;
       const len = Math.hypot(localRight, localFwd) || 1;
       out.push(localRight / len, localFwd / len);
+    }
+    return out;
+  }
+
+  /**
+   * Courbure SIGNÉE du tracé devant la voiture : angle (rad, /π) entre la tangente
+   * de la courbe centrale à la position courante et celle à `meters` plus loin, pour
+   * chaque distance de CURVATURE_DISTANCES. Ne dépend que du tracé (pas de la voiture)
+   * : signe = sens du virage, amplitude = sévérité. Permet le freinage anticipé.
+   */
+  private castCurvature(progress: number): number[] {
+    if (this._curveLength === 0) this._curveLength = this.track.curve.getLength();
+    this.track.curve.getTangentAt(progress % 1, this._t0);
+    const out: number[] = [];
+    for (const meters of CURVATURE_DISTANCES) {
+      const u = (progress + meters / this._curveLength) % 1;
+      this.track.curve.getTangentAt(u, this._t1);
+      // Angle signé dans le plan horizontal (xz) entre t0 et t1.
+      const cross = this._t0.x * this._t1.z - this._t0.z * this._t1.x;
+      const dot = this._t0.x * this._t1.x + this._t0.z * this._t1.z;
+      out.push(Math.atan2(cross, dot) / Math.PI);
     }
     return out;
   }

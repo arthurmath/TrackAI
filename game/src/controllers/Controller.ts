@@ -39,6 +39,14 @@ export interface VehicleObservation {
    * des virages à venir.
    */
   lookahead: number[];
+  /**
+   * Courbure SIGNÉE du tracé devant la voiture : angle (rad, normalisé par π)
+   * entre la tangente de la courbe centrale à la position courante et celle N
+   * mètres plus loin, pour 2 distances (proche puis loin) : [courbure_15m,
+   * courbure_35m]. Signe = sens du virage, amplitude = sévérité. Permet à l'IA
+   * d'anticiper et de freiner AVANT un virage serré.
+   */
+  curvature: number[];
   /** True si la voiture est hors-piste / retournée. */
   offTrack: boolean;
   /** True si l'épisode vient de se terminer (blocage, reset forcé). */

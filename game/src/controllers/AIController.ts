@@ -31,27 +31,6 @@ const MAX_BUFFERED_BYTES = 64 * 1024;
 export class AIController implements Controller {
   readonly kind = 'ai' as const;
 
-  // --- Diagnostic agrégé (toutes les voitures) : imprime 1×/s.
-  // calls/s : appels à pushObservation (prouve que la boucle de jeu tourne).
-  // sent/s  : observations réellement envoyées. skipBuf/s : sautées (backpressure).
-  // maxBuf  : plus grand bufferedAmount vu (si énorme → tuyau bouché).
-  private static diagCalls = 0;
-  private static diagSent = 0;
-  private static diagSkipBuf = 0;
-  private static diagMaxBuf = 0;
-  private static diagTimer: number | null = null;
-  private static startDiag(): void {
-    if (AIController.diagTimer !== null) return;
-    AIController.diagTimer = window.setInterval(() => {
-      console.log(`[AIdiag] calls/s=${AIController.diagCalls} sent/s=${AIController.diagSent} `
-        + `skipBuf/s=${AIController.diagSkipBuf} maxBuf=${AIController.diagMaxBuf}`);
-      AIController.diagCalls = 0;
-      AIController.diagSent = 0;
-      AIController.diagSkipBuf = 0;
-      AIController.diagMaxBuf = 0;
-    }, 1000);
-  }
-
   private socket: WebSocket | null = null;
   private latestAction: ControlState = { ...NEUTRAL_CONTROL };
   private lastSendTime = 0;
@@ -63,7 +42,6 @@ export class AIController implements Controller {
     private readonly init?: AIInit,
     private readonly sendInit = false,
   ) {
-    AIController.startDiag();
     this.connect();
   }
 
@@ -125,26 +103,19 @@ export class AIController implements Controller {
   }
 
   pushObservation(obs: VehicleObservation): boolean {
-    AIController.diagCalls++;
     if (!this.connected || !this.socket) return false;
     if (this.socket.readyState !== WebSocket.OPEN) return false;
     const now = performance.now();
     const minInterval = 1000 / this.stateSendRate;
     if (now - this.lastSendTime < minInterval) return false;
-    const buffered = this.socket.bufferedAmount;
-    if (buffered > AIController.diagMaxBuf) AIController.diagMaxBuf = buffered;
     // Backpressure : si le serveur Python n'absorbe pas les observations assez
     // vite, la file d'envoi du navigateur (bufferedAmount) grossit sans limite,
     // engorge le tuyau TCP et finit par geler l'entraînement. Plutôt que d'empiler,
     // on saute l'observation quand la file dépasse le seuil : perdre quelques
     // observations est sans impact sur l'apprentissage, un tuyau bouché est fatal.
-    if (buffered > MAX_BUFFERED_BYTES) {
-      AIController.diagSkipBuf++;
-      return false;
-    }
+    if (this.socket.bufferedAmount > MAX_BUFFERED_BYTES) return false;
     this.lastSendTime = now;
     this.socket.send(JSON.stringify({ type: 'observation', data: obs }));
-    AIController.diagSent++;
     return true;
   }
 

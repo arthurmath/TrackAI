@@ -17,8 +17,9 @@ os.makedirs(series_dir, exist_ok=True)
 
 # --- Dimensions du problème (partagées par main.py et l'agent) ----------------
 # État : [forwardSpeed, lateralSpeed, 5 capteurs, offTrack,
-#         lookahead 10m (droite, avant), lookahead 25m (droite, avant)] -> 12
-STATE_DIM = 12
+#         lookahead 10m (droite, avant), lookahead 25m (droite, avant),
+#         courbure 15m, courbure 35m] -> 14
+STATE_DIM = 14
 # Action continue : [drive (coast/throttle), steer] -> 2
 ACTION_DIM = 2
 SENSOR_MAX = 50.0          # doit correspondre à SENSOR_MAX dans RaceSession.ts
@@ -98,6 +99,9 @@ def extract_state(obs):
     # Direction vers les points de visée (repère local voiture, déjà unitaires) :
     # [droite_10m, avant_10m, droite_25m, avant_25m]. Cf. RaceSession.castLookahead.
     lookahead = obs.get("lookahead", [0.0, 1.0, 0.0, 1.0])
+    # Courbure signée du tracé devant : [courbure_15m, courbure_35m], déjà normalisée
+    # (/π). Cf. RaceSession.castCurvature. Permet le freinage anticipé en virage.
+    curvature = obs.get("curvature", [0.0, 0.0])
 
     # Vitesse latérale signée = projection de la vitesse sur l'axe droite.
     rx, ry, rz = _right_vector(rot)
@@ -110,6 +114,8 @@ def extract_state(obs):
     state.append(1.0 if off else 0.0)
     for i in range(4):
         state.append(float(lookahead[i]) if i < len(lookahead) else 0.0)
+    for i in range(2):
+        state.append(float(curvature[i]) if i < len(curvature) else 0.0)
     return state
 
 

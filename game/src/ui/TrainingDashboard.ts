@@ -5,6 +5,7 @@
  * courbe qui se met à jour. Découplé de la boucle de jeu (simple setInterval).
  */
 import { AI_CONFIG } from '../config';
+import { formatTime } from '../utils/helpers';
 import { drawTrainingChart, type ScorePoint } from './TrainingGraph';
 
 interface RewardPoint {
@@ -22,6 +23,7 @@ interface Metrics {
   timestep: number;
   updateTimestep: number;
   stopRequested: boolean;
+  bestLapMs: number | null;
   scores: ScorePoint[];
   rewards: RewardPoint[];
 }
@@ -44,8 +46,9 @@ export class TrainingDashboard {
     this.root.innerHTML = `
       <h3>Entraînement · live</h3>
       <div class="td-stats">
-        <div class="td-stat"><div class="v" id="td-trainings">0</div><div class="k">Entraînements</div></div>
+        <div class="td-stat"><div class="v" id="td-lap">—</div><div class="k">Meilleur tour</div></div>
         <div class="td-stat"><div class="v" id="td-best">0.00</div><div class="k">Meilleur (tours)</div></div>
+        <div class="td-stat"><div class="v" id="td-trainings">0</div><div class="k">Entraînements</div></div>
         <div class="td-stat"><div class="v" id="td-avg">—</div><div class="k">Progrès moy.</div></div>
         <div class="td-stat"><div class="v" id="td-reward">—</div><div class="k">Récomp. moy.</div></div>
         <div class="td-stat"><div class="v" id="td-cars">0</div><div class="k">Voitures</div></div>
@@ -60,6 +63,7 @@ export class TrainingDashboard {
     this.canvas = this.root.querySelector('#td-chart')!;
     this.bar = this.root.querySelector('#td-bar-fill')!;
     this.els = {
+      lap: this.root.querySelector('#td-lap')!,
       trainings: this.root.querySelector('#td-trainings')!,
       best: this.root.querySelector('#td-best')!,
       avg: this.root.querySelector('#td-avg')!,
@@ -110,6 +114,7 @@ export class TrainingDashboard {
     const lastScore = m.scores.length ? m.scores[m.scores.length - 1] : null;
     const lastReward = m.rewards.length ? m.rewards[m.rewards.length - 1] : null;
 
+    this.els.lap.textContent = m.bestLapMs != null ? formatTime(m.bestLapMs) : '—';
     this.els.trainings.textContent = String(m.trainings);
     this.els.best.textContent = m.bestProgress.toFixed(2);
     this.els.avg.textContent = lastScore ? lastScore.avg_progress.toFixed(2) : '—';
