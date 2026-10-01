@@ -77,7 +77,7 @@ Interface overlay en HTML/CSS positionné en absolute sur le canvas :
 ```
 ┌─────────────────────────────────┐
 │  LAP 2/3          00:01:23.456  │
-│  BEST  00:01:19.002  △+04.454  │
+│  BEST  00:01:19.002   △+04.454  │
 │                                 │
 │                         185 km/h│
 │                        [====  ] │  ← speedometer arc SVG

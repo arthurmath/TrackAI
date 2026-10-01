@@ -1,8 +1,8 @@
 ## Start project
 
-cd ai
-uv sync
-cd ..
+cd ai  
+uv sync  
+cd ..  
 cd game  
 npm install  
 npm run dev  
