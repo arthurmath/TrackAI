@@ -10,6 +10,9 @@ import { AssetLoader } from '../../utils/AssetLoader';
 
 const DEFAULT_WHEEL_NAMES = ['Wheel_FL', 'Wheel_FR', 'Wheel_RL', 'Wheel_RR'];
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
+// +Z is forward: a negative rotation around X raises the nose.
+const MODEL_PITCH = -THREE.MathUtils.degToRad(1);
+const PITCH_AXIS = new THREE.Vector3(1, 0, 0);
 
 interface SplitBuffers {
   position: number[];
@@ -364,6 +367,23 @@ export class CarConstructor {
             config.modelOffset.y,
             config.modelOffset.z,
           );
+        }
+        // Pitch the complete visual around the rear axle, keeping its height.
+        // Apply in chassis space, after each model's own import orientation.
+        const rearWheels = config.wheelConnections.filter((wheel) => !wheel.steering);
+        if (rearWheels.length > 0) {
+          const rearAxle = new THREE.Vector3();
+          for (const wheel of rearWheels) {
+            rearAxle.add(new THREE.Vector3(
+              wheel.x,
+              wheel.y - config.suspensionRestLength,
+              wheel.z,
+            ));
+          }
+          rearAxle.divideScalar(rearWheels.length);
+          const pitch = new THREE.Quaternion().setFromAxisAngle(PITCH_AXIS, MODEL_PITCH);
+          modelRoot.position.sub(rearAxle).applyQuaternion(pitch).add(rearAxle);
+          modelRoot.quaternion.premultiply(pitch);
         }
         // OBJ exports are often untextured; GLB materials (maps) must be preserved.
         const isUntexturedObj = config.modelPath!.toLowerCase().endsWith('.obj');
