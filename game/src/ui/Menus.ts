@@ -4,6 +4,10 @@
  * dans un conteneur dédié et communique via des callbacks.
  */
 import type { VehicleConfig } from '../assets/cars/types';
+import { CARS } from '../assets/cars';
+import { TRACKS } from '../assets/tracks';
+import { getCarPreview, getTrackPreview } from './AssetPreviews';
+import { trackMapSvg, trackLengthMeters } from './TrackMap';
 import type { TrackDefinition } from '../assets/tracks/types';
 import type { RaceSnapshot } from '../utils/Recorder';
 import { formatTime } from '../utils/helpers';
@@ -17,6 +21,11 @@ export interface SavedWeight {
   score: number;
   timestamp: string;
 }
+
+const arrow = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12h15M13 5l7 7-7 7" stroke="currentColor" stroke-width="1.8"/></svg>';
+const flag = '<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M6 28V5h20v15H6" stroke="currentColor" stroke-width="2"/><path d="M7 6h6v6H7zm12 0h6v6h-6zm-6 6h6v7h-6z" fill="currentColor"/></svg>';
+const escapeHtml = (value: string): string => value.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+const hex = (color: number): string => `#${color.toString(16).padStart(6, '0')}`;
 
 export class Menus {
   private readonly container: HTMLElement;
@@ -33,27 +42,88 @@ export class Menus {
     this.container.classList.add('hidden');
   }
 
-  private screen(html: string): HTMLElement {
+  private screen(html: string, layout = 'utility', section = 'Paddock', step = 0): HTMLElement {
+    this.progressFill = null;
     this.container.classList.remove('hidden');
-    this.container.innerHTML = `<div class="screen">${html}</div>`;
-    return this.container.querySelector('.screen')!;
+    this.container.innerHTML = `
+      <div class="screen ${layout}-screen">
+        <header class="menu-header">
+          <div class="brand" aria-label="Track AI"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>TRACK<span>AI</span><span class="brand-divider"></span><small>RACING LAB</small></div>
+          ${step ? `<ol class="setup-steps" aria-label="Préparation de la course">
+            <li class="${step === 1 ? 'current' : 'complete'}" ${step === 1 ? 'aria-current="step"' : ''}><b>01</b> Garage</li>
+            <li class="${step === 2 ? 'current' : ''}" ${step === 2 ? 'aria-current="step"' : ''}><b>02</b> Circuit</li>
+            <li><b>03</b> Départ</li>
+          </ol>` : `<span class="header-section">${section}</span>`}
+          <span class="header-status"><i></i> PRÊT À ROULER</span>
+        </header>
+        <main class="menu-content">${html}</main>
+        <footer class="menu-footer"><span>DRIVE. LEARN. REPEAT.</span><span>TRACK AI <b>/</b> LE CHRONO N'ATTEND QUE VOUS</span><span class="footer-stripes" aria-hidden="true">/////</span></footer>
+      </div>`;
+    const screen = this.container.querySelector<HTMLElement>('.screen')!;
+    const heading = screen.querySelector<HTMLElement>('h1, h2');
+    heading?.setAttribute('tabindex', '-1');
+    heading?.focus({ preventScroll: true });
+    return screen;
+  }
+
+  private previewMarkup(label: string): string {
+    return `<img class="asset-preview" alt="${escapeHtml(label)}" hidden /><span class="preview-placeholder" role="status"><i></i>Chargement de l’aperçu</span>`;
+  }
+
+  private setPreview(frame: HTMLElement, request: Promise<string>): void {
+    const image = frame.querySelector<HTMLImageElement>('.asset-preview')!;
+    const placeholder = frame.querySelector<HTMLElement>('.preview-placeholder')!;
+    // A newer selection can reuse this frame before a previous render finishes.
+    const token = String(Number(frame.dataset.previewVersion ?? 0) + 1);
+    frame.dataset.previewVersion = token;
+    image.hidden = true;
+    placeholder.hidden = false;
+    placeholder.innerHTML = '<i></i>Chargement de l’aperçu';
+    frame.classList.remove('preview-ready');
+    request.then((url) => {
+      if (!frame.isConnected || frame.dataset.previewVersion !== token) return;
+      image.src = url;
+      image.hidden = false;
+      placeholder.hidden = true;
+      frame.classList.add('preview-ready');
+    }).catch(() => {
+      if (frame.isConnected && frame.dataset.previewVersion === token) {
+        placeholder.textContent = 'Aperçu 3D indisponible';
+      }
+    });
   }
 
   // ---------- Menu principal ----------
   showMain(cb: { onPlay: () => void; onAI: () => void; onEditor: () => void }): void {
+    const featured = CARS.find((car) => car.modelPath) ?? CARS[0];
     const s = this.screen(`
-      <h1>TRACK&nbsp;AI</h1>
-      <div class="subtitle">Web 3D Race Game · Three.js + Rapier</div>
-      <div class="menu-col">
-        <button class="btn primary" id="m-play">Play</button>
-        <button class="btn" id="m-ai">IA Mode</button>
-        <button class="btn" id="m-editor">Éditeur de circuits <span class="tag">soon</span></button>
-      </div>
-      <div class="hint">Contrôles : Z/↑ accélérer · S/↓ frein/arrière · Q/D braquer · Espace frein à main · C caméra · R reset · Échap pause · F3 debug</div>
-    `);
+      <section class="home-hero">
+        <div class="hero-copy">
+          <div class="eyebrow"><span></span> VOTRE PROCHAINE TRAJECTOIRE</div>
+          <h1>LA PISTE<br>EST <em>À VOUS.</em></h1>
+          <p>Au volant ou aux commandes de l’IA.<br>Trouvez la trajectoire. Repoussez vos limites.</p>
+          <button class="btn primary hero-cta" id="m-play">PRENDRE LE DÉPART ${arrow}</button>
+          <div class="hero-inventory"><span><b>${String(CARS.length).padStart(2, '0')}</b> VOITURES</span><span><b>${String(TRACKS.length).padStart(2, '0')}</b> CIRCUITS</span><span><b>∞</b> TRAJECTOIRES</span></div>
+        </div>
+        <div class="hero-visual" aria-label="${escapeHtml(featured.name)}">
+          <span class="hero-orbit orbit-one" aria-hidden="true"></span><span class="hero-orbit orbit-two" aria-hidden="true"></span>
+          <span class="hero-word" aria-hidden="true">FULL<br>THROTTLE</span>
+          <div class="hero-car" id="home-preview">${this.previewMarkup(featured.name)}</div>
+          <span class="hero-sticker">BUILT<br>TO RACE <span>↗</span></span>
+          <div class="hero-caption"><span class="tiny-cross" aria-hidden="true">+</span><span>${escapeHtml(featured.name)}<small>LE GOÛT DE LA VITESSE</small></span><span class="hero-caption-line"></span><span>01 / ${String(CARS.length).padStart(2, '0')}</span></div>
+        </div>
+      </section>
+      <section class="mode-grid" aria-label="Modes de jeu">
+        <button class="mode-card race-mode" id="m-race"><span class="mode-icon">${flag}</span><span class="mode-copy"><small>01 / À VOUS DE JOUER</small><strong>Course libre</strong><span>Votre voiture. Votre circuit. Votre record.</span></span><span class="mode-arrow">${arrow}</span></button>
+        <button class="mode-card ai-mode" id="m-ai"><span class="mode-icon"><svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="m7 7 18 9-18 9V7Zm0 0 18 18M7 25 25 7" stroke="currentColor" stroke-width="1.5"/><circle cx="7" cy="7" r="3" fill="currentColor"/><circle cx="25" cy="7" r="3" fill="currentColor"/><circle cx="25" cy="25" r="3" fill="currentColor"/><circle cx="7" cy="25" r="3" fill="currentColor"/></svg></span><span class="mode-copy"><small>02 / L’INTELLIGENCE EN PISTE</small><strong>AI Lab</strong><span>Entraînez un agent. Observez ses progrès.</span></span><span class="mode-arrow">${arrow}</span></button>
+        <button class="mode-card editor-mode" id="m-editor" disabled><span class="mode-icon"><svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="m16 4 12 7-12 7L4 11 16 4ZM4 17l12 7 12-7M4 23l12 7 12-7" stroke="currentColor" stroke-width="1.6"/></svg></span><span class="mode-copy"><small>03 / IMAGINEZ LA SUITE</small><strong>Éditeur de circuits</strong><span>De nouvelles lignes à inventer.</span></span><span class="soon-badge">BIENTÔT</span></button>
+      </section>
+      <details class="controls-guide"><summary><span class="keyboard-icon" aria-hidden="true">⌨</span> LES COMMANDES <span>+</span></summary><div class="control-keys"><span><kbd>Z / ↑</kbd> Accélérer</span><span><kbd>S / ↓</kbd> Freiner</span><span><kbd>Q D / ← →</kbd> Braquer</span><span><kbd>Espace</kbd> Frein à main</span><span><kbd>C</kbd> Caméra</span><span><kbd>R</kbd> Replacer</span><span><kbd>Échap</kbd> Pause</span></div></details>
+    `, 'home', 'Accueil');
     s.querySelector('#m-play')!.addEventListener('click', cb.onPlay);
+    s.querySelector('#m-race')!.addEventListener('click', cb.onPlay);
     s.querySelector('#m-ai')!.addEventListener('click', cb.onAI);
-    s.querySelector('#m-editor')!.addEventListener('click', cb.onEditor);
+    this.setPreview(s.querySelector('#home-preview')!, getCarPreview(featured));
   }
 
   private optionPickerHtml(
@@ -73,7 +143,7 @@ export class Menus {
     const options = items
       .map(
         (item, i) =>
-          `<button type="button" class="weight-option${i === 0 ? ' selected' : ''}" data-value="${item.value}">${item.label}</button>`,
+          `<button type="button" class="weight-option${i === 0 ? ' selected' : ''}" data-value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</button>`,
       )
       .join('');
     return `
@@ -81,14 +151,14 @@ export class Menus {
         <span class="warm-label">${label}</span>
         <div class="weight-dropdown">
           <button type="button" class="weight-trigger">
-            <span class="weight-value">${first.label}</span>
+            <span class="weight-value">${escapeHtml(first.label)}</span>
             <span class="weight-chevron" aria-hidden="true">▾</span>
           </button>
           <div class="weight-menu hidden">
             ${options}
           </div>
         </div>
-        <input type="hidden" class="weight-input" value="${first.value}" />
+        <input type="hidden" class="weight-input" value="${escapeHtml(first.value)}" />
       </div>`;
   }
 
@@ -160,39 +230,28 @@ export class Menus {
       : `<button class="btn server-launch" id="ai-server-start">Lancer le serveur python</button>`;
 
     const s = this.screen(`
-      <h2>AI Mode</h2>
-      <div class="subtitle">Pilotage par un agent (serveur Python · WebSocket)</div>
-      <div class="ai-server-row">
-        ${serverBtnHtml}
-      </div>
+      <div class="section-heading"><div><div class="eyebrow">L’INTELLIGENCE EN PISTE</div><h2>AI <em>LAB.</em></h2><p>Faites de chaque tour une leçon de pilotage.</p></div><span class="section-index">/ LAB</span></div>
+      <div class="lab-status"><div><span class="status-indicator ${serverRunning ? 'online' : ''}"></span><strong>${serverRunning ? 'Votre équipe est en ligne' : 'Connectez votre équipe'}</strong><span>Le serveur IA pilote les agents et leur entraînement.</span></div>${serverBtnHtml}</div>
       <div class="ai-mode-row">
         <div class="ai-mode-col">
-          <button class="btn primary" id="ai-player">AI Player</button>
-          <div class="ai-panel hidden" id="player-panel">
-            ${this.weightPickerHtml('player', weights)}
-          </div>
+          <button class="btn lab-choice primary" id="ai-player" aria-pressed="false"><span class="lab-number">01</span><small>OBSERVER</small><strong>Agent pilote</strong><span>Regardez votre agent entraîné prendre le volant.</span>${arrow}</button>
+          <div class="ai-panel hidden" id="player-panel">${this.weightPickerHtml('player', weights)}</div>
         </div>
         <div class="ai-mode-col">
-          <button class="btn cold" id="train-cold">Cold Start</button>
+          <button class="btn lab-choice cold" id="train-cold" aria-pressed="false"><span class="lab-number">02</span><small>ENTRAÎNER</small><strong>Partir de zéro</strong><span>Un nouvel agent, une première trajectoire.</span>${arrow}</button>
         </div>
         <div class="ai-mode-col">
-          <button class="btn warm" id="train-warm">Warm Start</button>
-          <div class="ai-panel hidden" id="warm-panel">
-            ${this.weightPickerHtml('warm', weights)}
-          </div>
+          <button class="btn lab-choice warm" id="train-warm" aria-pressed="false"><span class="lab-number">03</span><small>AMÉLIORER</small><strong>Reprendre l’entraînement</strong><span>Continuez à partir de poids sauvegardés.</span>${arrow}</button>
+          <div class="ai-panel hidden" id="warm-panel">${this.weightPickerHtml('warm', weights)}</div>
         </div>
         <div class="ai-mode-col">
-          <button class="btn graphs" id="ai-graphs">Graphs</button>
+          <button class="btn lab-choice graphs" id="ai-graphs"><span class="lab-number">04</span><small>ANALYSER</small><strong>Performances</strong><span>Explorez les courbes de progression.</span>${arrow}</button>
         </div>
       </div>
-      <div class="menu-col ai-nav-row">
-        <button class="btn ghost" id="ai-back">Retour</button>
-        <button class="btn primary" id="ai-continue" disabled>Continue</button>
-      </div>
-      <div class="hint">Le serveur gère à la fois l'inférence (AI Player) et l'entraînement (Cold / Warm Start).</div>
-    `);
+      <div class="selection-footer"><button class="btn ghost" id="ai-back">← Retour à l’accueil</button><span class="selection-help">Choisissez le prochain défi de votre agent.</span><button class="btn primary" id="ai-continue" disabled>CONTINUER ${arrow}</button></div>
+    `, 'lab', 'AI Lab');
 
-    let running = serverRunning;
+    const running = serverRunning;
 
     const serverStartBtn = s.querySelector<HTMLButtonElement>('#ai-server-start');
     serverStartBtn?.addEventListener('click', async () => {
@@ -242,6 +301,9 @@ export class Menus {
       playerBtn.classList.toggle('active', mode === 'play');
       coldBtn.classList.toggle('active', mode === 'cold');
       warmBtn.classList.toggle('active', mode === 'warm');
+      playerBtn.setAttribute('aria-pressed', String(mode === 'play'));
+      coldBtn.setAttribute('aria-pressed', String(mode === 'cold'));
+      warmBtn.setAttribute('aria-pressed', String(mode === 'warm'));
       playerPanel.classList.toggle('hidden', mode !== 'play');
       warmPanel.classList.toggle('hidden', mode !== 'warm');
       updateContinue();
@@ -290,15 +352,15 @@ export class Menus {
     const fileItems = files.map((f) => ({ value: f, label: f }));
 
     const s = this.screen(`
-      <h2>Graphs</h2>
-      <div class="subtitle">Évolution de l'entraînement · ai/results/series</div>
+      <div class="eyebrow">AI LAB / TÉLÉMÉTRIE</div><h2>CHAQUE TOUR <em>COMPTE.</em></h2>
+      <div class="subtitle">Évolution des performances de vos agents</div>
       <div class="graphs-toolbar">
         <div class="graphs-file-picker" id="graphs-file-picker">
           ${this.optionPickerHtml('graphs-file', 'Fichier', fileItems, 'Aucun fichier')}
         </div>
         <label class="graphs-toggle">
           <input type="checkbox" id="graphs-show-best" checked />
-          <span>best_progress</span>
+          <span>Afficher la meilleure progression</span>
         </label>
       </div>
       <div class="graphs-canvas-wrap">
@@ -358,33 +420,47 @@ export class Menus {
     selectedId: string,
     cb: { onSelect: (id: string) => void; onNext: () => void; onBack: () => void },
   ): void {
-    const cards = vehicles
-      .map(
-        (v) => `
-        <div class="card ${v.id === selectedId ? 'selected' : ''}" data-id="${v.id}">
-          <div class="swatch" style="background: linear-gradient(135deg, #${v.color
-            .toString(16)
-            .padStart(6, '0')}, #1a1d26)"></div>
-          <div class="name">${v.name}</div>
-          <div class="meta">Masse ${v.mass} kg · Vmax ~${Math.round(v.maxSpeed * 3.6)} km/h</div>
-        </div>`,
-      )
-      .join('');
-
+    const current = vehicles.find((v) => v.id === selectedId) ?? vehicles[0];
+    const cards = vehicles.map((v, i) => `
+      <button type="button" class="vehicle-card ${v.id === current.id ? 'selected' : ''}" data-id="${escapeHtml(v.id)}" aria-pressed="${v.id === current.id}" style="--vehicle-accent:${hex(v.color)}">
+        <span class="card-number">${String(i + 1).padStart(2, '0')}</span><span class="selection-check" aria-hidden="true">✓</span>
+        <span class="vehicle-thumb" data-car-preview="${escapeHtml(v.id)}">${this.previewMarkup(v.name)}</span>
+        <span class="vehicle-card-label"><span><small>${v.modelPath ? 'MONOPLACE' : 'ENTRAÎNEMENT'}</small><strong>${escapeHtml(v.name)}</strong></span><span>${Math.round(v.maxSpeed * 3.6)}<small>KM/H</small></span></span>
+      </button>`).join('');
     const s = this.screen(`
-      <h2>Choisis ta voiture</h2>
-      <div class="card-grid">${cards}</div>
-      <div class="menu-col" style="flex-direction:row; gap:14px;">
-        <button class="btn ghost" id="v-back">Retour</button>
-        <button class="btn primary" id="v-next">Continuer</button>
+      <div class="section-heading"><div><div class="eyebrow">01 / LE GARAGE</div><h2>VOTRE <em>MACHINE.</em></h2><p>Choisissez celle qui signera votre prochain record.</p></div><span class="section-count"><b>${String(vehicles.length).padStart(2, '0')}</b> VOITURES DISPONIBLES</span></div>
+      <div class="garage-layout">
+        <section class="vehicle-showcase"><div class="showcase-top"><span>PRÊTE POUR LA PISTE</span><span>VUE DU VÉHICULE</span></div><div class="showcase-watermark" aria-hidden="true">RACE</div><div class="showcase-image" id="vehicle-preview">${this.previewMarkup(current.name)}</div><div class="showcase-caption"><span class="tiny-cross">+</span><span id="vehicle-kind"></span><span>TRACK AI / GARAGE</span></div></section>
+        <aside class="vehicle-options" aria-label="Voitures disponibles">${cards}</aside>
       </div>
-    `);
-
-    s.querySelectorAll<HTMLElement>('.card').forEach((card) => {
+      <div class="vehicle-specs" aria-live="polite"><div class="selected-vehicle"><small>VOTRE SÉLECTION</small><h3 id="vehicle-name"></h3></div><div class="spec"><span>VITESSE MAX. ESTIMÉE</span><strong id="vehicle-speed"></strong></div><div class="spec"><span>MASSE</span><strong id="vehicle-mass"></strong></div><div class="spec"><span>MOTORISATION</span><strong id="vehicle-drive"></strong></div></div>
+      <div class="selection-footer"><button class="btn ghost" id="v-back">← Retour</button><span class="selection-help">Votre ligne de départ se rapproche.</span><button class="btn primary" id="v-next">CHOISIR LE CIRCUIT ${arrow}</button></div>
+    `, 'garage', 'Garage', 1);
+    const update = (vehicle: VehicleConfig): void => {
+      s.querySelector('#vehicle-name')!.textContent = vehicle.name;
+      s.querySelector('#vehicle-speed')!.innerHTML = `${Math.round(vehicle.maxSpeed * 3.6)} <small>km/h</small>`;
+      s.querySelector('#vehicle-mass')!.innerHTML = `${vehicle.mass.toLocaleString('fr-FR')} <small>kg</small>`;
+      const powered = vehicle.wheelConnections.filter((wheel) => wheel.powered);
+      s.querySelector('#vehicle-drive')!.textContent = powered.length === 4 ? '4 roues motrices' : powered.every((wheel) => wheel.z < 0) ? 'Propulsion' : 'Traction';
+      s.querySelector('#vehicle-kind')!.textContent = vehicle.modelPath ? 'MONOPLACE / COMPÉTITION' : 'TRAINING / ESSENTIEL';
+      const frame = s.querySelector<HTMLElement>('#vehicle-preview')!;
+      frame.querySelector('img')!.alt = vehicle.name;
+      this.setPreview(frame, getCarPreview(vehicle));
+    };
+    update(current);
+    for (const vehicle of vehicles) {
+      const frame = [...s.querySelectorAll<HTMLElement>('[data-car-preview]')].find((el) => el.dataset.carPreview === vehicle.id)!;
+      this.setPreview(frame, getCarPreview(vehicle));
+    }
+    s.querySelectorAll<HTMLButtonElement>('.vehicle-card').forEach((card) => {
       card.addEventListener('click', () => {
-        s.querySelectorAll('.card').forEach((c) => c.classList.remove('selected'));
-        card.classList.add('selected');
-        cb.onSelect(card.dataset.id!);
+        s.querySelectorAll('.vehicle-card').forEach((other) => {
+          other.classList.toggle('selected', other === card);
+          other.setAttribute('aria-pressed', String(other === card));
+        });
+        const vehicle = vehicles.find((v) => v.id === card.dataset.id)!;
+        update(vehicle);
+        cb.onSelect(vehicle.id);
       });
     });
     s.querySelector('#v-next')!.addEventListener('click', cb.onNext);
@@ -398,34 +474,35 @@ export class Menus {
     selectedId: string,
     cb: { onSelect: (id: string) => void; onStart: () => void; onBack: () => void },
   ): void {
-    const cards = tracks
-      .map((t) => {
-        const best = getBestTimeMs(t.id, vehicleId);
-        return `
-        <div class="card ${t.id === selectedId ? 'selected' : ''}" data-id="${t.id}">
-          <div class="swatch" style="background: linear-gradient(135deg, #${t.accentColor
-            .toString(16)
-            .padStart(6, '0')}, #0b0e14)"></div>
-          <div class="name">${t.name}</div>
-          <div class="meta">Best: ${best != null ? formatTime(best) : '—'}</div>
-        </div>`;
-      })
-      .join('');
-
+    const current = tracks.find((t) => t.id === selectedId) ?? tracks[0];
+    const vehicle = CARS.find((v) => v.id === vehicleId);
+    const cards = tracks.map((t, i) => {
+      const best = getBestTimeMs(t.id, vehicleId);
+      return `<button type="button" class="track-card ${t.id === current.id ? 'selected' : ''}" data-id="${escapeHtml(t.id)}" aria-pressed="${t.id === current.id}" style="--track-accent:${hex(t.accentColor)}">
+        <span class="track-scene" data-track-preview="${escapeHtml(t.id)}">${this.previewMarkup(`Vue d’ensemble : ${t.name}`)}<span class="track-scene-shade"></span><span class="track-number">CIRCUIT / ${String(i + 1).padStart(2, '0')}</span><span class="selection-check" aria-hidden="true">✓</span><span class="track-map">${trackMapSvg(t, 'track-route')}</span></span>
+        <span class="track-card-info"><span class="track-category">${t.scenery === 'sunset-park' ? 'GOLDEN HOUR' : t.modelPath ? 'GRAND PRIX' : 'NIGHT SESSION'}</span><strong>${escapeHtml(t.name)}</strong><span class="track-data"><span>${Math.round(trackLengthMeters(t))} <small>MÈTRES</small></span><span>${t.roadWidth.toLocaleString('fr-FR')} <small>M DE LARGE</small></span></span><span class="track-record"><span>RECORD PERSONNEL</span><b>${best != null ? formatTime(best) : 'À établir'}</b></span></span>
+      </button>`;
+    }).join('');
     const s = this.screen(`
-      <h2>Choisis ton circuit</h2>
-      <div class="card-grid">${cards}</div>
-      <div class="menu-col" style="flex-direction:row; gap:14px;">
-        <button class="btn ghost" id="t-back">Retour</button>
-        <button class="btn primary" id="t-start">Démarrer la course</button>
-      </div>
-    `);
-
-    s.querySelectorAll<HTMLElement>('.card').forEach((card) => {
+      <div class="section-heading"><div><div class="eyebrow">02 / LES CIRCUITS</div><h2>TROUVEZ VOTRE <em>TERRAIN.</em></h2><p>Quatre ambiances. Une obsession : le prochain chrono.</p></div><span class="section-count"><b>${String(tracks.length).padStart(2, '0')}</b> CIRCUITS À EXPLORER</span></div>
+      <div class="track-grid" aria-label="Circuits disponibles">${cards}</div>
+      <div class="race-summary"><div class="summary-icon">${flag}</div><div><small>VOTRE GRILLE DE DÉPART</small><strong><span>${escapeHtml(vehicle?.name ?? vehicleId)}</span><span class="summary-separator">/</span><span id="selected-track-name" aria-live="polite">${escapeHtml(current.name)}</span></strong></div><span class="map-legend"><i></i> Point de départ sur le tracé</span></div>
+      <div class="selection-footer"><button class="btn ghost" id="t-back">← Retour au garage</button><span class="selection-help">Le plus dur, c’est de lever le pied.</span><button class="btn primary" id="t-start">LANCER LA COURSE ${arrow}</button></div>
+    `, 'tracks', 'Circuits', 2);
+    // Start with the selected track; render and cache the rest in the background.
+    for (const track of [current, ...tracks.filter((t) => t !== current)]) {
+      const frame = [...s.querySelectorAll<HTMLElement>('[data-track-preview]')].find((el) => el.dataset.trackPreview === track.id)!;
+      this.setPreview(frame, getTrackPreview(track));
+    }
+    s.querySelectorAll<HTMLButtonElement>('.track-card').forEach((card) => {
       card.addEventListener('click', () => {
-        s.querySelectorAll('.card').forEach((c) => c.classList.remove('selected'));
-        card.classList.add('selected');
-        cb.onSelect(card.dataset.id!);
+        s.querySelectorAll('.track-card').forEach((other) => {
+          other.classList.toggle('selected', other === card);
+          other.setAttribute('aria-pressed', String(other === card));
+        });
+        const track = tracks.find((t) => t.id === card.dataset.id)!;
+        s.querySelector('#selected-track-name')!.textContent = track.name;
+        cb.onSelect(track.id);
       });
     });
     s.querySelector('#t-start')!.addEventListener('click', cb.onStart);
@@ -435,22 +512,25 @@ export class Menus {
   // ---------- Chargement ----------
   showLoading(): void {
     this.screen(`
-      <h2>Chargement…</h2>
+      <div class="loading-emblem" aria-hidden="true">${flag}</div><div class="eyebrow">LA LIGNE DE DÉPART SE PRÉPARE</div><h2>PLACE À LA <em>COURSE.</em></h2><p class="loading-caption" role="status">Préparation de votre voiture et du circuit…</p>
       <div class="progress-wrap">
-        <div class="progress-bar"><div class="progress-fill" id="loading-fill"></div></div>
+        <div class="progress-bar" role="progressbar" aria-label="Chargement de la course" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="progress-fill" id="loading-fill"></div></div>
       </div>
     `);
     this.progressFill = this.container.querySelector('#loading-fill');
   }
 
   setProgress(frac: number): void {
-    if (this.progressFill) this.progressFill.style.width = `${Math.round(frac * 100)}%`;
+    if (!this.progressFill) return;
+    const percent = Math.round(Math.max(0, Math.min(1, frac)) * 100);
+    this.progressFill.style.width = `${percent}%`;
+    this.progressFill.parentElement?.setAttribute('aria-valuenow', String(percent));
   }
 
   // ---------- Pause ----------
   showPause(cb: { onResume: () => void; onRestart: () => void; onMenu: () => void }): void {
     const s = this.screen(`
-      <h2>Pause</h2>
+      <div class="eyebrow">ARRÊT AU STAND</div><h2>ON <em>SOUFFLE.</em></h2><p class="subtitle">La piste vous attend.</p>
       <div class="menu-col">
         <button class="btn primary" id="p-resume">Reprendre</button>
         <button class="btn" id="p-restart">Recommencer</button>
@@ -472,13 +552,13 @@ export class Menus {
       .map((t, i) => `<tr><td>Tour ${i + 1}</td><td class="val">${formatTime(t)}</td></tr>`)
       .join('');
     const s = this.screen(`
-      <h2>Arrivée !</h2>
+      <div class="eyebrow">DRAPEAU À DAMIER</div><h2>BIEN <em>JOUÉ.</em></h2>
       ${isRecord ? '<div class="record-badge">★ NOUVEAU RECORD</div>' : ''}
       <div class="hud-time" style="font-size:46px">${formatTime(snap.elapsedMs)}</div>
       <table class="results-table">${laps}
-        <tr><td>Meilleur</td><td class="val">${snap.bestTimeMs != null ? formatTime(snap.bestTimeMs) : '—'}</td></tr>
+        <tr><td>Meilleur</td><td class="val">${snap.bestTimeMs != null ? formatTime(snap.bestTimeMs) : 'À établir'}</td></tr>
       </table>
-      <div class="menu-col" style="flex-direction:row; gap:14px;">
+      <div class="menu-col results-actions">
         <button class="btn primary" id="r-restart">Recommencer</button>
         <button class="btn" id="r-menu">Menu principal</button>
       </div>
