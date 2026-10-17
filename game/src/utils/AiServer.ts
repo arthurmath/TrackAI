@@ -14,19 +14,11 @@ export class AiServer {
   static async start(): Promise<boolean> {
     if (await this.isRunning()) return true;
 
-    try {
-      const res = await fetch(AI_CONFIG.serverStartUrl, { method: 'POST' });
-      if (!res.ok) return false;
-      const data = (await res.json()) as { running?: boolean };
-      if (data.running) return true;
-
-      for (let i = 0; i < 30; i++) {
-        await new Promise((r) => setTimeout(r, 1000));
-        if (await this.isRunning()) return true;
-      }
-      return false;
-    } catch {
-      return false;
+    const res = await fetch(AI_CONFIG.serverStartUrl, { method: 'POST' });
+    const data = (await res.json()) as { running?: boolean; error?: string };
+    if (!res.ok || !data.running) {
+      throw new Error(data.error || 'Le serveur Python ne répond pas. Consulte les logs du terminal Vite.');
     }
+    return true;
   }
 }

@@ -1,12 +1,14 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vite';
 
 const AI_PORT = 8765;
 const WEIGHTS_URL = `http://127.0.0.1:${AI_PORT}/weights`;
 
 let aiProcess: ChildProcess | null = null;
+let aiProcessError: string | null = null;
 
 async function isAiServerRunning(): Promise<boolean> {
   try {
@@ -24,6 +26,7 @@ function sleep(ms: number): Promise<void> {
 async function waitForServer(maxAttempts = 30): Promise<boolean> {
   for (let i = 0; i < maxAttempts; i++) {
     if (await isAiServerRunning()) return true;
+    if (aiProcessError) throw new Error(aiProcessError);
     await sleep(1000);
   }
   return false;
@@ -32,16 +35,26 @@ async function waitForServer(maxAttempts = 30): Promise<boolean> {
 function startAiProcess(aiDir: string): void {
   if (aiProcess && !aiProcess.killed) return;
 
-  aiProcess = spawn('python3 main.py', {
+  aiProcessError = null;
+  let stderr = '';
+  const child = spawn('uv', ['run', 'main.py'], {
     cwd: aiDir,
-    shell: true,
-    detached: true,
-    stdio: 'ignore',
+    env: { ...process.env, TRACKAI_PORT: String(AI_PORT), PYTHONUNBUFFERED: '1' },
+    stdio: ['ignore', 'inherit', 'pipe'],
   });
-  aiProcess.unref();
+  aiProcess = child;
+  child.stderr?.on('data', (chunk: Buffer) => {
+    stderr = (stderr + chunk.toString()).slice(-8000);
+    process.stderr.write(chunk);
+  });
 
-  aiProcess.on('exit', () => {
-    aiProcess = null;
+  child.on('error', (err) => {
+    aiProcessError = `Impossible de lancer uv : ${err.message}`;
+    if (aiProcess === child) aiProcess = null;
+  });
+  child.on('exit', (code, signal) => {
+    aiProcessError = stderr.trim() || `Le serveur Python s'est arrêté (code ${code}, signal ${signal}).`;
+    if (aiProcess === child) aiProcess = null;
   });
 }
 
@@ -55,7 +68,7 @@ function sendJson(res: import('http').ServerResponse, status: number, body: unkn
 const SERIES_FILENAME_RE = /^history_[\w-]+\.json$/;
 
 export function aiServerPlugin(): Plugin {
-  const aiDir = path.resolve(process.cwd(), '..', 'ai');
+  const aiDir = fileURLToPath(new URL('../../ai/', import.meta.url));
   const seriesDir = path.join(aiDir, 'results', 'series');
 
   return {
@@ -107,7 +120,11 @@ export function aiServerPlugin(): Plugin {
           try {
             startAiProcess(aiDir);
             const ready = await waitForServer();
-            sendJson(res, ready ? 200 : 504, { running: ready, started: ready });
+            sendJson(res, ready ? 200 : 504, {
+              running: ready,
+              started: ready,
+              ...(!ready && { error: 'Le serveur Python ne répond pas après 30 secondes. Consulte les logs du terminal Vite.' }),
+            });
           } catch (err) {
             sendJson(res, 500, { running: false, error: String(err) });
           }

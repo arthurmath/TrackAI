@@ -260,11 +260,12 @@ export class Menus {
     serverStartBtn?.addEventListener('click', async () => {
       serverStartBtn.disabled = true;
       serverStartBtn.textContent = 'Démarrage…';
-      const ok = await cb.onStartServer();
-      if (!ok) {
+      try {
+        if (!await cb.onStartServer()) throw new Error('Le serveur Python ne répond pas.');
+      } catch (err) {
         serverStartBtn.disabled = false;
         serverStartBtn.textContent = 'Lancer le serveur python';
-        alert('Impossible de démarrer le serveur. Vérifie que uv est installé (cd ai · uv sync).');
+        alert(`Impossible de démarrer le serveur.\n${err instanceof Error ? err.message : String(err)}`);
       }
     });
 
