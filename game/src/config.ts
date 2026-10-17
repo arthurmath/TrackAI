@@ -42,7 +42,7 @@ export const ORBIT_CAMERA_CONFIG = {
 
 export const GRAPHICS_CONFIG = {
   shadows: true,
-  shadowMapSize: 2048,
+  shadowMapSize: 4096,
   /** Active le post-processing (bloom + motion blur). */
   postProcessing: false,
   bloom: {

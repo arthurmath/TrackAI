@@ -232,7 +232,8 @@ export function getCarPreview(config: VehicleConfig): Promise<string> {
       floor.position.set(center.x, -0.012, center.z);
       floor.receiveShadow = true;
       scene.add(floor);
-      target.render(scene, frameCamera(bounds, new THREE.Vector3(1.1, 0.65, 1.35), 1.14));
+      const padding = 1.14 / (config.previewScale ?? 1);
+      target.render(scene, frameCamera(bounds, new THREE.Vector3(1.1, 0.65, 1.35), padding));
       return target.domElement.toDataURL('image/png');
     } finally {
       resources.collect(scene);

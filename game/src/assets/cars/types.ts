@@ -19,6 +19,8 @@ export interface VehicleConfig {
   name: string;
   /** Couleur de carrosserie du placeholder (et teinte d'UI). */
   color: number;
+  /** Échelle dans les aperçus du garage uniquement (1 par défaut). */
+  previewScale?: number;
 
   mass: number; // kg
   /** Demi-dimensions du châssis (collider cuboid) en mètres. */
@@ -54,13 +56,15 @@ export interface VehicleConfig {
   modelScale?: number;
   /** Rotation Euler (radians) appliquée au modèle après chargement. */
   modelRotation?: Vec3;
+  /** Inclinaison longitudinale visuelle (radians, après la rotation du modèle). */
+  modelPitch?: number;
   /** Décalage visuel du modèle par rapport au centre du châssis (mètres). */
   modelOffset?: Vec3;
   /** Couleur uniforme appliquée à tous les meshes du modèle (remplace les matériaux). */
   modelColor?: number;
   /**
    * Animation visuelle des roues nommées :
-   * - `full` : position + braquage + roulement (placeholder procédural)
+   * - `full` : position + braquage + roulement (roues avec origine au centre de leur axe)
    * - `steer-only` : braquage sur place uniquement (modèles OBJ statiques)
    * - `none` : roues figées
    */
@@ -70,6 +74,8 @@ export interface VehicleConfig {
    * Par défaut : Wheel_FL, Wheel_FR, Wheel_RL, Wheel_RR.
    */
   wheelMeshNames?: string[];
+  /** Essieux fusionnés à séparer en mode `full` (ordre : avant, arrière). */
+  wheelAxleMeshNames?: string[];
   /**
    * Roues avant à braquer en mode `steer-only` (ordre : FL, FR).
    * Les autres roues du modèle restent figées.

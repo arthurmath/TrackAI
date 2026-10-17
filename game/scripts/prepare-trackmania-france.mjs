@@ -38,8 +38,7 @@ function append(data, target) {
 const wheelNames = ['FL', 'FR', 'RL', 'RR'];
 const tireNode = gltf.nodes.find(n => n.name === 'Wheels_01_Wheels_0');
 if (!tireNode || tireNode.mesh === undefined) throw new Error('Expected the original merged wheel mesh.');
-const tireMesh = tireNode.mesh;
-const tirePrimitive = gltf.meshes[tireMesh].primitives[0];
+const tirePrimitive = gltf.meshes[tireNode.mesh].primitives[0];
 function point(positions, index, axis) {
   return binary.readFloatLE(positions.start + index * positions.stride + axis * 4);
 }
@@ -174,6 +173,35 @@ gltf.meshes = gltf.meshes.filter((mesh, i) => {
   return true;
 });
 for (const node of gltf.nodes) if (node.mesh !== undefined) node.mesh = meshRemap.get(node.mesh);
+// Compact away the original geometry copies after rebuilding the primitives.
+const usedAccessors = new Set(gltf.meshes.flatMap(mesh => mesh.primitives.flatMap(p => [p.indices, ...Object.values(p.attributes)])));
+const accessorRemap = new Map();
+gltf.accessors = gltf.accessors.filter((a, i) => {
+  if (!usedAccessors.has(i)) return false;
+  accessorRemap.set(i, accessorRemap.size);
+  return true;
+});
+for (const mesh of gltf.meshes) for (const p of mesh.primitives) {
+  p.indices = accessorRemap.get(p.indices);
+  for (const semantic of Object.keys(p.attributes)) p.attributes[semantic] = accessorRemap.get(p.attributes[semantic]);
+}
+const usedViews = new Set([...gltf.accessors.map(a => a.bufferView), ...gltf.images.map(image => image.bufferView)]);
+const allBinary = Buffer.concat(chunks);
+chunks.length = 0;
+byteLength = 0;
+const viewRemap = new Map();
+gltf.bufferViews = gltf.bufferViews.filter((view, i) => {
+  if (!usedViews.has(i)) return false;
+  const padding = (4 - byteLength % 4) % 4;
+  chunks.push(Buffer.alloc(padding)); byteLength += padding;
+  chunks.push(allBinary.subarray(view.byteOffset ?? 0, (view.byteOffset ?? 0) + view.byteLength));
+  view.byteOffset = byteLength;
+  byteLength += view.byteLength;
+  viewRemap.set(i, viewRemap.size);
+  return true;
+});
+for (const a of gltf.accessors) a.bufferView = viewRemap.get(a.bufferView);
+for (const image of gltf.images) if (image.bufferView !== undefined) image.bufferView = viewRemap.get(image.bufferView);
 const binPadding = (4 - byteLength % 4) % 4;
 chunks.push(Buffer.alloc(binPadding)); byteLength += binPadding;
 gltf.buffers[0].byteLength = byteLength;

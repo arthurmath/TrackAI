@@ -23,7 +23,7 @@ export const car_1: VehicleConfig = {
   wheelFriction: 2.2,
   lateralFriction: 1.1,
   maxSteering: 0.82,
-  engineForce: 8000,
+  engineForce: 9200,
   brakeForce: 160,
   handbrakeForce: 420,
   maxSpeed: 82,

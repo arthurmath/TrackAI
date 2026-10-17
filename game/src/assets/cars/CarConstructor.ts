@@ -116,6 +116,9 @@ function splitMergedAxleMesh(mesh: THREE.Mesh): THREE.Mesh[] {
     }
     geom.setIndex(data.index);
     const half = new THREE.Mesh(geom, material);
+    half.position.copy(mesh.position);
+    half.quaternion.copy(mesh.quaternion);
+    half.scale.copy(mesh.scale);
     half.name = `${mesh.name}_${suffix}`;
     half.castShadow = mesh.castShadow;
     half.receiveShadow = mesh.receiveShadow;
@@ -203,13 +206,17 @@ export class VehicleView {
   private readonly wheelBaseRotations: THREE.Euler[] = [];
   private readonly wheelBaseQuaternions: THREE.Quaternion[] = [];
   private readonly steerAxes: THREE.Vector3[] = [];
-  private readonly steerPhysicsIndices: number[] = [];
+  private readonly wheelPhysicsIndices: number[] = [];
   private readonly steerWheelIndices = new Set<number>();
+  private readonly restingWheelPositions: THREE.Vector3[];
+  private readonly modelWheelOffsets: THREE.Vector3[] = [];
   private readonly wheelAnimation: 'full' | 'steer-only' | 'none';
   private readonly visualSteerScale: number;
   private readonly bodyMaterial: THREE.MeshStandardMaterial;
 
   constructor(config: VehicleConfig) {
+    this.restingWheelPositions = config.wheelConnections.map(wheel =>
+      new THREE.Vector3(wheel.x, wheel.y - config.suspensionRestLength, wheel.z));
     this.wheelAnimation = config.wheelAnimation ?? 'full';
     this.visualSteerScale = config.visualSteerScale ?? 1;
     config.wheelConnections.forEach((wc, i) => {
@@ -261,13 +268,15 @@ export class VehicleView {
     model: THREE.Object3D,
     wheelNames: string[],
     steerWheelMeshNames?: string[],
+    wheelAxleMeshNames?: string[],
   ): void {
     this.group.clear();
     this.wheelMeshes.length = 0;
     this.wheelBaseRotations.length = 0;
     this.wheelBaseQuaternions.length = 0;
     this.steerAxes.length = 0;
-    this.steerPhysicsIndices.length = 0;
+    this.wheelPhysicsIndices.length = 0;
+    this.modelWheelOffsets.length = 0;
     model.traverse((o) => {
       if ((o as THREE.Mesh).isMesh) {
         o.castShadow = true;
@@ -288,20 +297,47 @@ export class VehicleView {
           this.wheelMeshes.push(pivot);
           this.wheelBaseQuaternions.push(pivot.quaternion.clone());
           this.steerAxes.push(steerAxis);
-          this.steerPhysicsIndices.push(physicsIndices[physSlot] ?? physSlot);
+          this.wheelPhysicsIndices.push(physicsIndices[physSlot] ?? physSlot);
           physSlot++;
         }
       }
       return;
     }
 
-    for (const name of wheelNames) {
-      const w = model.getObjectByName(name);
-      if (w) {
-        this.wheelMeshes.push(w);
-        this.wheelBaseRotations.push(w.rotation.clone());
+    // Merged axle meshes use geometry centers; authored wheels use their origins.
+    // Reparent into chassis space before using the physics transforms: GLB import
+    // scale, orientation and offsets must not scale the suspension or move pivots.
+    this.group.updateWorldMatrix(true, true);
+    const toChassis = this.group.matrixWorld.clone().invert();
+    const resolvedWheels = wheelAxleMeshNames
+      ? wheelAxleMeshNames.flatMap(name => resolveSteerWheels(model, name))
+      : wheelNames.map(name => model.getObjectByName(name));
+    this.group.updateWorldMatrix(true, true);
+    resolvedWheels.forEach((wheel, physicsIndex) => {
+      if (!wheel) return;
+      const name = wheel.name;
+      const wheelMatrix = new THREE.Matrix4().multiplyMatrices(toChassis, wheel.matrixWorld);
+      const center = new THREE.Vector3().setFromMatrixPosition(wheelMatrix);
+      if (wheelAxleMeshNames && (wheel as THREE.Mesh).isMesh) {
+        const geometry = (wheel as THREE.Mesh).geometry;
+        geometry.computeBoundingBox();
+        geometry.boundingBox!.getCenter(center).applyMatrix4(wheelMatrix);
       }
-    }
+      const steeringPivot = new THREE.Group();
+      steeringPivot.name = `${name}_Steering`;
+      steeringPivot.position.copy(center);
+      const rollingPivot = new THREE.Group();
+      rollingPivot.name = `${name}_Rolling`;
+      steeringPivot.add(rollingPivot);
+      this.group.add(steeringPivot);
+      rollingPivot.add(wheel);
+      wheelMatrix.decompose(wheel.position, wheel.quaternion, wheel.scale);
+      wheel.position.sub(center);
+      this.wheelMeshes.push(steeringPivot);
+      this.wheelPhysicsIndices.push(physicsIndex);
+      // Retain the existing visual pitch while following suspension displacement.
+      this.modelWheelOffsets.push(center.clone().sub(this.restingWheelPositions[physicsIndex]));
+    });
   }
 
   update(position: THREE.Vector3, quaternion: THREE.Quaternion, wheels: WheelTransform[]): void {
@@ -309,14 +345,13 @@ export class VehicleView {
     this.group.quaternion.copy(quaternion);
     for (let i = 0; i < this.wheelMeshes.length; i++) {
       const pivot = this.wheelMeshes[i];
-      const physIdx = this.wheelAnimation === 'steer-only'
-        ? (this.steerPhysicsIndices[i] ?? i)
-        : i;
+      const physIdx = this.wheelPhysicsIndices[i] ?? i;
       if (physIdx >= wheels.length) continue;
       const w = wheels[physIdx];
       if (this.wheelAnimation === 'full') {
         pivot.position.copy(w.position);
-        pivot.rotation.set(0, w.steering, 0);
+        if (this.modelWheelOffsets[i]) pivot.position.add(this.modelWheelOffsets[i]);
+        pivot.rotation.set(0, w.steering * this.visualSteerScale, 0);
         const wheelMesh = pivot.children[0];
         if (wheelMesh) wheelMesh.rotation.x = w.roll;
       } else if (this.wheelAnimation === 'steer-only') {
@@ -381,7 +416,7 @@ export class CarConstructor {
             ));
           }
           rearAxle.divideScalar(rearWheels.length);
-          const pitch = new THREE.Quaternion().setFromAxisAngle(PITCH_AXIS, MODEL_PITCH);
+          const pitch = new THREE.Quaternion().setFromAxisAngle(PITCH_AXIS, config.modelPitch ?? MODEL_PITCH);
           modelRoot.position.sub(rearAxle).applyQuaternion(pitch).add(rearAxle);
           modelRoot.quaternion.premultiply(pitch);
         }
@@ -403,7 +438,7 @@ export class CarConstructor {
           }
         });
         const wheelNames = config.wheelMeshNames ?? DEFAULT_WHEEL_NAMES;
-        view.replaceWithModel(modelRoot, wheelNames, config.steerWheelMeshNames);
+        view.replaceWithModel(modelRoot, wheelNames, config.steerWheelMeshNames, config.wheelAxleMeshNames);
       }
     }
 

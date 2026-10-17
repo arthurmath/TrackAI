@@ -1,6 +1,9 @@
 /** Stadium Sprint : boucle technique compacte au milieu de l'arène. */
 import type { TrackDefinition } from '../types';
 
+// Échelle commune au stade et à la piste physique, sans modifier les voitures.
+const CIRCUIT_SCALE = 2;
+
 // Enchaînements de virages sur les deux côtés, avec des raccords arrondis.
 // Rayon minimal interpolé : environ 4,6 m, sans pincement des bords de route.
 const CENTERLINE = [
@@ -123,8 +126,13 @@ export const track_3: TrackDefinition = {
   /** Cyan électrique évoquant l'éclairage LED des stades modernes. */
   accentColor: 0x00d4ff,
 
-  centerline: CENTERLINE,
-  roadWidth: 7.5,
+  centerline: CENTERLINE.map(({ x, y, z }) => ({
+    x: x * CIRCUIT_SCALE,
+    y: y * CIRCUIT_SCALE,
+    z: z * CIRCUIT_SCALE,
+  })),
+  roadWidth: 7.5 * CIRCUIT_SCALE,
+  // Même hauteur compacte que Sunset Oval, indépendante de l'échelle du stade.
   barrierHeight: 0.85,
   roadStyle: 'raceway',
   segments: 480,
@@ -133,7 +141,7 @@ export const track_3: TrackDefinition = {
   gravity: { x: 0, y: -9.81, z: 0 },
 
   /** Sol physique invisible (filet de sécurité sous le terrain du stade). */
-  groundSize: 600,
+  groundSize: 600 * CIRCUIT_SCALE,
   groundColor: 0x1a3d0a,
 
   /** Projecteurs blancs équilibrés pour garder les couleurs du stade. */
@@ -154,9 +162,9 @@ export const track_3: TrackDefinition = {
   lights: [
     {
       type: 'point',
-      position: { x: 0, y: 60, z: 0 },
+      position: { x: 0, y: 60 * CIRCUIT_SCALE, z: 0 },
       color: 0xfff8ef,
-      intensity: 300,
+      intensity: 300 * CIRCUIT_SCALE,
       distance: 0,
       decay: 1,
     },
@@ -167,13 +175,13 @@ export const track_3: TrackDefinition = {
   /** Départ à l'ouest, avant les enchaînements nord. */
   startU: 0,
 
-  /** Modèle 3D du stade (décor uniquement — la piste reste procédurale). */
+  /** Modèle 3D du stade (décor uniquement, la piste reste procédurale). */
   modelPath: '/models/tracks/stadium/source/wc1.glb',
 
   /**
-   * Le stade conserve son échelle : seul le circuit occupe moins de terrain.
+   * Le stade suit l'agrandissement de la piste pour conserver leur alignement.
    */
-  modelScale: 7,
+  modelScale: 7 * CIRCUIT_SCALE,
 
   /** Route asphaltée + barrières latéraires visibles par-dessus le GLB. */
   showProceduralTrack: true,

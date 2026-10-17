@@ -141,6 +141,7 @@ Chaque frame, `RaceSession` peut pousser une observation (position, capteurs ray
 
 ## Backlog : 
 
+- Boost après un dérapage ? 
 - Ajouter un ou deux points de visée (lookahead): direction vers un point sur la courbe centrale 10 /25m devant. Comme ça l'agent voit le virage. (a faire avant le système de checkpoints)
 - Track : changements d'altitude, des virages inclinés, un saut/une rampe, et une boucle ou un boost pad si possible.
 - **Contrôle de l'assiette en vol** réglage de l'assiette (tangage) et du roulis en plein vol, à la manière de Trackmania.

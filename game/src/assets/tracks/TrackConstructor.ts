@@ -526,18 +526,19 @@ export class TrackConstructor {
     visible: boolean,
   ): void {
     const size = def.groundSize;
+    const height = def.groundHeight ?? -0.02;
     const geo = new THREE.PlaneGeometry(size, size, 1, 1);
     geo.rotateX(-Math.PI / 2);
     const mat = new THREE.MeshStandardMaterial({ color: def.groundColor, roughness: 1.0, metalness: 0.0 });
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.y = -0.02;
+    mesh.position.y = height;
     mesh.receiveShadow = true;
     if (visible) group.add(mesh);
     else { geo.dispose(); mat.dispose(); }
 
     // Collider sol : pavé fin (plus robuste qu'un demi-espace pour le raycast).
     const collider = RAPIER.ColliderDesc.cuboid(size / 2, 0.1, size / 2)
-      .setTranslation(0, -0.12, 0)
+      .setTranslation(0, height - 0.1, 0)
       .setFriction(0.7);
     this.world.createCollider(collider, body);
   }

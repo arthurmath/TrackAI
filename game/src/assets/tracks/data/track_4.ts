@@ -22,6 +22,9 @@
  */
 import type { TrackDefinition } from '../types';
 
+// Échelle commune au décor et à la piste physique, sans modifier les voitures.
+const CIRCUIT_SCALE = 2;
+
 // Ligne centrale extraite du mesh « Asfalto » du GLB (24 points de contrôle).
 // Le dernier point se relie au premier (boucle fermée CatmullRom) : ce segment
 // de fermeture est la longue droite ouest, interpolée en ligne droite.
@@ -57,17 +60,23 @@ export const track_4: TrackDefinition = {
   name: 'Cartoon GP',
   accentColor: 0x4caf50,
 
-  centerline: CENTERLINE,
+  centerline: CENTERLINE.map(({ x, y, z }) => ({
+    x: x * CIRCUIT_SCALE,
+    y: y * CIRCUIT_SCALE,
+    z: z * CIRCUIT_SCALE,
+  })),
   /** Largeur du collider ≈ largeur de l'asphalte du modèle (6 m) + petite marge. */
-  roadWidth: 6.5,
-  barrierHeight: 1.0,
+  roadWidth: 6.5 * CIRCUIT_SCALE,
+  barrierHeight: 1.0 * CIRCUIT_SCALE,
   segments: 420,
 
   roadFriction: 1.0,
   gravity: { x: 0, y: -9.81, z: 0 },
 
   /** Sol physique de sécurité (invisible : le GLB fournit le terrain visible). */
-  groundSize: 700,
+  groundSize: 700 * CIRCUIT_SCALE,
+  // Sous l'asphalte et le collider de route, même après agrandissement.
+  groundHeight: -0.5 * CIRCUIT_SCALE,
   groundColor: 0x4f9e3a,
 
   /** Ambiance diurne ensoleillée, cohérente avec le rendu cartoon clair. */
@@ -96,7 +105,7 @@ export const track_4: TrackDefinition = {
 
   /** Modèle 3D du circuit (décor + asphalte visible). */
   modelPath: '/models/tracks/cartoon_circuit/scene.gltf',
-  modelScale: 1,
+  modelScale: CIRCUIT_SCALE,
 
   /**
    * Route procédurale masquée : seul l'asphalte du GLB est visible. Le collider

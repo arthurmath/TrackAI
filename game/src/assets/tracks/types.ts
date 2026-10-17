@@ -68,6 +68,8 @@ export interface TrackDefinition {
 
   /** Taille du sol carré (mètres). */
   groundSize: number;
+  /** Altitude de la surface du sol de sécurité (-0.02 m par défaut). */
+  groundHeight?: number;
   groundColor: number;
 
   /** Ensemble de décors et de matériaux procéduraux propre au circuit. */

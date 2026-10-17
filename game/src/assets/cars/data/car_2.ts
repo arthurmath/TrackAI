@@ -24,7 +24,7 @@ export const car_2: VehicleConfig = {
     wheelFriction: 2.2,
     lateralFriction: 1.1,
     maxSteering: 0.82,
-    engineForce: 8000,
+    engineForce: 9200,
     brakeForce: 160,
     handbrakeForce: 420,
     maxSpeed: 82,
@@ -37,10 +37,10 @@ export const car_2: VehicleConfig = {
     modelRotation: { x: 0, y: Math.PI, z: 0 },
     /** Compense la nouvelle échelle pour conserver la hauteur du bas des pneus. */
     modelOffset: { x: 0, y: -0.91844, z: 0 },
-    /** Braquage visuel des roues avant (mesh GLB statique, essieu fusionné). */
-    wheelAnimation: 'steer-only',
-    /** GLB Sketchfab : l'essieu avant est Object_13 (Wheel1Mtl, roues G+D fusionnées). */
-    steerWheelMeshNames: ['Object_13'],
+    /** Roulement, braquage et suspension des quatre roues. */
+    wheelAnimation: 'full',
+    /** Essieux avant et arrière du GLB, chacun avec les roues G+D fusionnées. */
+    wheelAxleMeshNames: ['Object_13', 'Object_12'],
     /** Le mesh GLB braque visuellement plus fort que la physique. */
     visualSteerScale: 0.65,
 };
