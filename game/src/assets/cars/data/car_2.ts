@@ -31,12 +31,12 @@ export const car_2: VehicleConfig = {
     centerOfMassOffset: { x: 0, y: -0.32, z: 0 },
 
     modelPath: '/models/cars/f1/source/f1.glb',
-    /** ~21 unités de longueur native → ~6 m en jeu. */
-    modelScale: 0.25,
+    /** Échelle visuelle : longueur 4,00 m, largeur 1,67 m. */
+    modelScale: 0.180625,
     /** Le modèle Roblox pointe vers -Z ; la physique utilise +Z comme avant. */
     modelRotation: { x: 0, y: Math.PI, z: 0 },
-    /** Origine du mesh au-dessus du sol — aligner les roues sur la piste. */
-    modelOffset: { x: 0, y: -0.9, z: 0 },
+    /** Compense la nouvelle échelle pour conserver la hauteur du bas des pneus. */
+    modelOffset: { x: 0, y: -0.91844, z: 0 },
     /** Braquage visuel des roues avant (mesh GLB statique, essieu fusionné). */
     wheelAnimation: 'steer-only',
     /** GLB Sketchfab : l'essieu avant est Object_13 (Wheel1Mtl, roues G+D fusionnées). */

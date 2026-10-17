@@ -11,9 +11,13 @@ export interface Vec3 {
 }
 
 export interface TrackLighting {
+  /** Atmosphère procédurale facultative, réservée aux circuits qui l'activent. */
+  skyStyle?: 'sunset';
   skyColor: number;
   groundColor: number;
   fogColor?: number;
+  fogNear?: number;
+  fogFar?: number;
   ambientColor: number;
   ambientIntensity: number;
   hemiIntensity: number;
@@ -65,6 +69,9 @@ export interface TrackDefinition {
   /** Taille du sol carré (mètres). */
   groundSize: number;
   groundColor: number;
+
+  /** Ensemble de décors et de matériaux procéduraux propre au circuit. */
+  scenery?: 'sunset-park';
 
   lighting: TrackLighting;
   /** Sources lumineuses locales (projecteurs, spots de stade, etc.). */

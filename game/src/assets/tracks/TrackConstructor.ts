@@ -13,6 +13,8 @@ import * as THREE from 'three';
 import type { TrackDefinition } from './types';
 import type { VehicleSpawn } from '../../physics/VehicleController';
 import { AssetLoader } from '../../utils/AssetLoader';
+import { buildSunsetCircuit, createSunsetAsphalt } from './SunsetCircuit';
+import { buildSunsetEnvironment } from './SunsetEnvironment';
 
 export interface BuiltTrack {
   group: THREE.Group;
@@ -175,6 +177,7 @@ export class TrackConstructor {
     // masqués (le GLB remplace le visuel) sauf si showProceduralTrack est activé.
     const useGLB = !!def.modelPath;
     const showTrackVisuals = !useGLB || !!def.showProceduralTrack;
+    const sunset = def.scenery === 'sunset-park';
 
     const group = new THREE.Group();
     group.name = `track_${def.id}`;
@@ -209,15 +212,19 @@ export class TrackConstructor {
     this.buildRoad(group, trackBody, leftEdge, rightEdge, def, showTrackVisuals);
 
     // --- Barrières ---
-    this.buildBarrier(group, trackBody, leftEdge, def.barrierHeight, 0x3344ff, showTrackVisuals);
-    this.buildBarrier(group, trackBody, rightEdge, def.barrierHeight, 0xff3344, showTrackVisuals);
+    this.buildBarrier(group, trackBody, leftEdge, def.barrierHeight, 0x3344ff, showTrackVisuals && !sunset);
+    this.buildBarrier(group, trackBody, rightEdge, def.barrierHeight, 0xff3344, showTrackVisuals && !sunset);
+    if (sunset && showTrackVisuals) {
+      buildSunsetCircuit(group, samples, leftEdge, rightEdge, curve, def.roadWidth, def.barrierHeight, def.startU ?? 0);
+    }
 
     // --- Sol ---
     this.buildGround(group, trackBody, def, !useGLB);
 
     // --- Décor (ignoré quand le GLB fournit l'environnement) ---
     if (!useGLB) {
-      this.buildDecorations(group, def);
+      if (sunset) buildSunsetEnvironment(group, samples, def.roadWidth);
+      else this.buildDecorations(group, def);
     }
 
     this.buildLights(group, def);
@@ -253,10 +260,15 @@ export class TrackConstructor {
       } else {
         // Fallback : afficher le visuel procédural si le GLB est absent.
         this.buildRoad(group, trackBody, leftEdge, rightEdge, def, true);
-        this.buildBarrier(group, trackBody, leftEdge, def.barrierHeight, 0x3344ff, true);
-        this.buildBarrier(group, trackBody, rightEdge, def.barrierHeight, 0xff3344, true);
+        this.buildBarrier(group, trackBody, leftEdge, def.barrierHeight, 0x3344ff, !sunset);
+        this.buildBarrier(group, trackBody, rightEdge, def.barrierHeight, 0xff3344, !sunset);
         this.buildGround(group, trackBody, def, true);
-        this.buildDecorations(group, def);
+        if (sunset) {
+          if (!showTrackVisuals) {
+            buildSunsetCircuit(group, samples, leftEdge, rightEdge, curve, def.roadWidth, def.barrierHeight, startU);
+          }
+          buildSunsetEnvironment(group, samples, def.roadWidth);
+        } else this.buildDecorations(group, def);
       }
     }
 
@@ -288,6 +300,9 @@ export class TrackConstructor {
 
     const dispose = (): void => {
       this.scene.remove(group);
+      const geometries = new Set<THREE.BufferGeometry>();
+      const materials = new Set<THREE.Material>();
+      const textures = new Set<THREE.Texture>();
       group.traverse((o) => {
         const light = o as THREE.Light;
         if (light.isLight) {
@@ -296,12 +311,19 @@ export class TrackConstructor {
         }
         const m = o as THREE.Mesh;
         if (m.isMesh) {
-          m.geometry?.dispose();
-          const mat = m.material;
-          if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
-          else mat?.dispose();
+          geometries.add(m.geometry);
+          for (const material of Array.isArray(m.material) ? m.material : [m.material]) {
+            materials.add(material);
+            for (const value of Object.values(material)) {
+              if (value instanceof THREE.Texture) textures.add(value);
+            }
+          }
+          if (m instanceof THREE.InstancedMesh) m.dispose();
         }
       });
+      geometries.forEach(geometry => geometry.dispose());
+      materials.forEach(material => material.dispose());
+      textures.forEach(texture => texture.dispose());
       this.world.removeRigidBody(trackBody);
     };
 
@@ -355,15 +377,19 @@ export class TrackConstructor {
     const uvs: number[] = [];
     const indices: number[] = [];
 
-    for (let i = 0; i < N; i++) {
-      const y = left[i].y + 0.02;
-      positions.push(left[i].x, y, left[i].z);
-      positions.push(right[i].x, right[i].y + 0.02, right[i].z);
-      const v = i / N;
-      uvs.push(0, v * 40, 1, v * 40);
+    let distance = 0;
+    // Duplicate the closing pair so texture coordinates remain continuous at the seam.
+    for (let i = 0; i <= N; i++) {
+      const index = i % N;
+      if (i > 0) distance += (left[index].distanceTo(left[i - 1]) + right[index].distanceTo(right[i - 1])) / 2;
+      const y = left[index].y + 0.02;
+      positions.push(left[index].x, y, left[index].z);
+      positions.push(right[index].x, right[index].y + 0.02, right[index].z);
+      const v = distance / 14;
+      uvs.push(0, v, 1, v);
     }
     for (let i = 0; i < N; i++) {
-      const j = (i + 1) % N;
+      const j = i + 1;
       const li = 2 * i;
       const ri = 2 * i + 1;
       const lj = 2 * j;
@@ -378,7 +404,7 @@ export class TrackConstructor {
     geo.setIndex(indices);
     geo.computeVertexNormals();
 
-    const mat = new THREE.MeshStandardMaterial({
+    const mat = visible && def.scenery === 'sunset-park' ? createSunsetAsphalt() : new THREE.MeshStandardMaterial({
       color: 0x222222,
       roughness: 0.98,
       metalness: 0.0,
@@ -386,6 +412,7 @@ export class TrackConstructor {
     const mesh = new THREE.Mesh(geo, mat);
     mesh.receiveShadow = true;
     if (visible) group.add(mesh);
+    else { geo.dispose(); mat.dispose(); }
 
     // Collider trimesh dérivé du maillage de la route.
     const collider = RAPIER.ColliderDesc.trimesh(
@@ -469,6 +496,7 @@ export class TrackConstructor {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     if (visible) group.add(mesh);
+    else { geo.dispose(); mat.dispose(); }
 
     const collider = RAPIER.ColliderDesc.trimesh(
       new Float32Array(positions),
@@ -493,6 +521,7 @@ export class TrackConstructor {
     mesh.position.y = -0.02;
     mesh.receiveShadow = true;
     if (visible) group.add(mesh);
+    else { geo.dispose(); mat.dispose(); }
 
     // Collider sol : pavé fin (plus robuste qu'un demi-espace pour le raycast).
     const collider = RAPIER.ColliderDesc.cuboid(size / 2, 0.1, size / 2)
