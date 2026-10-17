@@ -71,7 +71,7 @@ export interface TrackDefinition {
   groundColor: number;
 
   /** Ensemble de décors et de matériaux procéduraux propre au circuit. */
-  scenery?: 'sunset-park';
+  scenery?: 'sunset-park' | 'midnight-park';
 
   /** Asphalte texturé, vibreurs et glissières partagés entre les circuits. */
   roadStyle?: 'raceway';

@@ -178,12 +178,14 @@ export class TrackConstructor {
     // masqués (le GLB remplace le visuel) sauf si showProceduralTrack est activé.
     const useGLB = !!def.modelPath;
     const showTrackVisuals = !useGLB || !!def.showProceduralTrack;
-    const sunset = def.scenery === 'sunset-park';
+    const midnight = def.scenery === 'midnight-park';
+    const park = def.scenery === 'sunset-park' || midnight;
     const raceway = def.roadStyle === 'raceway';
     const signage = {
       title: def.name.toUpperCase(),
-      subtitle: sunset ? '01 / FOREST RACEWAY' : '03 / STADIUM RACEWAY',
-      chevrons: sunset ? [0.12, 0.36, 0.55, 0.76] : [0.18, 0.39, 0.61, 0.82],
+      subtitle: midnight ? '02 / MOONLIT RACEWAY' : park ? '01 / FOREST RACEWAY' : '03 / STADIUM RACEWAY',
+      chevrons: midnight ? [0.12, 0.23, 0.34, 0.47, 0.56, 0.67, 0.8, 0.9]
+        : park ? [0.12, 0.36, 0.55, 0.76] : [0.18, 0.39, 0.61, 0.82],
     };
 
     const group = new THREE.Group();
@@ -230,7 +232,7 @@ export class TrackConstructor {
 
     // --- Décor (ignoré quand le GLB fournit l'environnement) ---
     if (!useGLB) {
-      if (sunset) buildSunsetEnvironment(group, samples, def.roadWidth);
+      if (park) buildSunsetEnvironment(group, samples, def.roadWidth);
       else this.buildDecorations(group, def);
     }
 
@@ -276,7 +278,7 @@ export class TrackConstructor {
           }
         }
         this.buildGround(group, trackBody, def, true);
-        if (sunset) {
+        if (park) {
           buildSunsetEnvironment(group, samples, def.roadWidth);
         } else this.buildDecorations(group, def);
       }

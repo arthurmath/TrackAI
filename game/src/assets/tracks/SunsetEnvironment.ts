@@ -103,7 +103,7 @@ function leafGeometry(): THREE.BufferGeometry {
   return geometry;
 }
 
-/** Nature dressing for Sunset Oval. Everything is visual; the driving surface stays flat. */
+/** Shared park scenery for Sunset Oval and Midnight Circuit. Everything is visual; the driving surface stays flat. */
 export function buildSunsetEnvironment(
   group: THREE.Group,
   samples: THREE.Vector3[],
@@ -114,6 +114,8 @@ export function buildSunsetEnvironment(
   group.add(environment);
   const rng = seededRandom(20261017);
   const center = new THREE.Box3().setFromPoints(samples).getCenter(new THREE.Vector3());
+  // Larger technical layouts need the same flat meadow beneath every corner.
+  const flatRadius = Math.max(112, ...samples.map(p => Math.hypot(p.x - center.x, p.z - center.z) + roadWidth / 2 + 8));
   const clearance = roadWidth / 2 + 4;
 
   // Use the complete sampled polyline, including the closing segment, rather
@@ -135,13 +137,13 @@ export function buildSunsetEnvironment(
   };
   const terrainHeight = (x: number, z: number): number => {
     const radial = Math.hypot(x - center.x, z - center.z);
-    const rise = THREE.MathUtils.smoothstep(radial, 112, 235);
+    const rise = THREE.MathUtils.smoothstep(radial, flatRadius, Math.max(235, flatRadius + 90));
     const waves = 0.5 + 0.24 * Math.sin(x * 0.022 + z * 0.008)
       + 0.18 * Math.cos(z * 0.028 - x * 0.009);
     return rise * (8 + waves * 48) - 0.012;
   };
 
-  // The first 112 m stay perfectly level, with only a fine meadow texture.
+  // The complete circuit stays level, with only a fine meadow texture.
   // Low-frequency vertex colours break up the large, otherwise uniform lawn.
   const terrainGeometry = new THREE.PlaneGeometry(700, 700, 140, 140);
   terrainGeometry.rotateX(-Math.PI / 2);

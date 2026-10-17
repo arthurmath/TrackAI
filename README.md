@@ -139,13 +139,11 @@ Chaque frame, `RaceSession` peut pousser une observation (position, capteurs ray
 
 
 
-## Prochaines étapes : 
-
-faire un bouton qui lance automatiquement le server python dans un nouveau terminal
-
+## Backlog : 
 
 - Ajouter un ou deux points de visée (lookahead): direction vers un point sur la courbe centrale 10 /25m devant. Comme ça l'agent voit le virage. (a faire avant le système de checkpoints)
 - Track : changements d'altitude, des virages inclinés, un saut/une rampe, et une boucle ou un boost pad si possible.
+- **Contrôle de l'assiette en vol** réglage de l'assiette (tangage) et du roulis en plein vol, à la manière de Trackmania.
 - **Plateformes de boost** et **surfaces modifiant la vitesse** (par exemple, zones à faible adhérence / de terre) en option.
 - **4 roues** avec paramètres configurables : suspension travel, stiffness, damping, friction. Animation des roues : rotation de direction sur les roues avant + rotation de roulement sur toutes les roues en fonction de la vitesse.
 - Faire un menu système solaire, l'utilisateur peut choisir la planète et, pour chaque planète, il y aura un stade d'entrainement pour tester la gravité, les mécaniques de jeu etc. et plusieurs circuits dans cet environnement. La dernière track du jeu sera un parcours multi planètes à la course arc en ciel Mariokart avec une fin dans le soleil ou trou noir. 
@@ -158,8 +156,6 @@ faire un bouton qui lance automatiquement le server python dans un nouveau termi
 - Appui aérodynamique/traînée aérodynamique affectant la maniabilité à grande vitesse.
 - Audio/Musique/Effet sonores
 - Prévoir un cycle jour/nuit 
-- **Contrôle de l'assiette en vol** réglage de l'assiette (tangage) et du roulis en plein vol, à la manière de Trackmania.
-- Respawn
 - Détection de voiture retournée pendant > 2s
 - Respawn au début du circuit avec vitesse nulle (animation de fondu)
 

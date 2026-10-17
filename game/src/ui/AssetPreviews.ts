@@ -257,10 +257,18 @@ export function getTrackPreview(definition: TrackDefinition): Promise<string> {
       const lighting = new Lighting(scene);
       lighting.apply(definition.lighting);
       // A small overview needs readable asphalt even for a night race.
-      // This fill light belongs only to the thumbnail, leaving race lighting intact.
+      // These lights belong only to the thumbnail, leaving race lighting intact.
       const sky = new THREE.Color(definition.lighting.skyColor);
       if (sky.getHSL({ h: 0, s: 0, l: 0 }).l < 0.15) {
-        scene.add(new THREE.AmbientLight(0xb5c9ef, 1.8));
+        if (definition.id === 'track_2') {
+          // Neutral fill and moonlight reveal Midnight's asphalt and surroundings.
+          scene.add(new THREE.AmbientLight(0xffffff, 3));
+          const moon = new THREE.DirectionalLight(0xc8d8ff, 5);
+          moon.position.set(-80, 140, 60);
+          scene.add(moon);
+        } else {
+          scene.add(new THREE.AmbientLight(0xb5c9ef, 1.8));
+        }
       }
       const track = await new TrackConstructor(physics.world, scene, loader).build(definition);
       const bounds = new THREE.Box3().setFromPoints(track.curve.getPoints(240));

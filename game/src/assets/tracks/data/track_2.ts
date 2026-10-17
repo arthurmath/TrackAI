@@ -1,37 +1,34 @@
-/**
- * track_2 — "Midnight Circuit" : tracé plus technique et serré, ambiance
- * nocturne fraîche. Démontre la variété de configuration des circuits.
- */
-import type { TrackDefinition, DecorationInstance } from '../types';
+/** Midnight Circuit : circuit boisé technique, éclairé au clair de lune. */
+import type { TrackDefinition } from '../types';
 
+// Ligne droite de départ, esses à l'est, double boucle au sud et chicane à l'ouest.
+// Les portions voisines restent espacées pour laisser place aux bordures et au décor.
 const CENTERLINE = [
-  { x: 0, y: 0, z: 60 },
-  { x: 40, y: 0, z: 55 },
-  { x: 70, y: 0, z: 20 },
-  { x: 75, y: 0, z: -20 },
-  { x: 50, y: 0, z: -55 },
-  { x: 10, y: 0, z: -70 },
-  { x: -30, y: 0, z: -60 },
-  { x: -65, y: 0, z: -30 },
-  { x: -75, y: 0, z: 10 },
-  { x: -55, y: 0, z: 45 },
-  { x: -20, y: 0, z: 62 },
+  { x: 0, y: 0, z: 100 },
+  { x: 60, y: 0, z: 100 },
+  { x: 110, y: 0, z: 80 },
+  { x: 125, y: 0, z: 45 },
+  { x: 100, y: 0, z: 15 },
+  { x: 65, y: 0, z: 5 },
+  { x: 55, y: 0, z: -20 },
+  { x: 90, y: 0, z: -45 },
+  { x: 110, y: 0, z: -80 },
+  { x: 85, y: 0, z: -115 },
+  { x: 35, y: 0, z: -125 },
+  { x: 0, y: 0, z: -100 },
+  { x: -5, y: 0, z: -65 },
+  { x: -35, y: 0, z: -45 },
+  { x: -65, y: 0, z: -65 },
+  { x: -90, y: 0, z: -100 },
+  { x: -125, y: 0, z: -85 },
+  { x: -140, y: 0, z: -45 },
+  { x: -115, y: 0, z: -15 },
+  { x: -80, y: 0, z: 5 },
+  { x: -75, y: 0, z: 35 },
+  { x: -105, y: 0, z: 60 },
+  { x: -110, y: 0, z: 90 },
+  { x: -65, y: 0, z: 105 },
 ];
-
-function buildDecorations(): DecorationInstance[] {
-  const decos: DecorationInstance[] = [];
-  for (let i = 0; i < 40; i++) {
-    const a = (i / 40) * Math.PI * 2;
-    const r = 95 + (i % 4) * 7;
-    decos.push({
-      type: i % 5 === 0 ? 'rock' : 'tree',
-      position: { x: Math.cos(a) * r, y: 0, z: Math.sin(a) * r },
-      rotationY: a * 1.3,
-      scale: 0.7 + (i % 3) * 0.3,
-    });
-  }
-  return decos;
-}
 
 export const track_2: TrackDefinition = {
   id: 'track_2',
@@ -40,22 +37,26 @@ export const track_2: TrackDefinition = {
   centerline: CENTERLINE,
   roadWidth: 12,
   barrierHeight: 0.95,
-  segments: 340,
+  segments: 640,
   roadFriction: 0.95,
   gravity: { x: 0, y: -9.81, z: 0 },
   groundSize: 700,
-  groundColor: 0x1f2433,
+  groundColor: 0x526447,
+  scenery: 'midnight-park',
+  roadStyle: 'raceway',
   lighting: {
     skyColor: 0x0b1026,
-    groundColor: 0x070a14,
-    fogColor: 0x0b1026,
-    ambientColor: 0x33406b,
-    ambientIntensity: 0.45,
-    hemiIntensity: 0.5,
-    sunColor: 0xaec4ff,
-    sunIntensity: 1.6,
+    groundColor: 0x344239,
+    fogColor: 0x18243c,
+    fogNear: 170,
+    fogFar: 540,
+    ambientColor: 0x9baacb,
+    ambientIntensity: 0.65,
+    hemiIntensity: 0.8,
+    sunColor: 0xb9d0ff,
+    sunIntensity: 2.2,
     sunDirection: { x: 0.4, y: 0.6, z: 0.5 },
   },
-  decorations: buildDecorations(),
+  decorations: [],
   startU: 0,
 };
