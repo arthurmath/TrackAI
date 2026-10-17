@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 /** Local, repeatable materials: no downloads and no per-frame texture work. */
-export function createSunsetAsphalt(): THREE.MeshStandardMaterial {
+export function createRacewayAsphalt(): THREE.MeshStandardMaterial {
   const size = 1024;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
@@ -126,7 +126,7 @@ function signTexture(title: string, subtitle: string, chevrons = false): THREE.C
   return texture;
 }
 
-export function buildSunsetCircuit(
+export function buildRacewayCircuit(
   group: THREE.Group,
   centers: THREE.Vector3[],
   left: THREE.Vector3[],
@@ -135,9 +135,10 @@ export function buildSunsetCircuit(
   roadWidth: number,
   barrierHeight: number,
   startU: number,
+  signage: { title: string; subtitle: string; chevrons: number[] },
 ): void {
   const details = new THREE.Group();
-  details.name = 'sunset-circuit-furniture';
+  details.name = 'raceway-circuit-furniture';
   const concrete = new THREE.MeshStandardMaterial({ color: 0xb4b6ad, roughness: 0.95, side: THREE.DoubleSide });
   const gravel = new THREE.MeshStandardMaterial({ color: 0x9c9b83, roughness: 1, side: THREE.DoubleSide });
   const steel = new THREE.MeshStandardMaterial({ color: 0x9aa7ab, metalness: 0.55, roughness: 0.38, side: THREE.DoubleSide });
@@ -202,7 +203,7 @@ export function buildSunsetCircuit(
     parent.add(mesh);
   };
   const gantry = new THREE.Group();
-  gantry.name = 'sunset-start-gantry';
+  gantry.name = 'raceway-start-gantry';
   gantry.position.copy(curve.getPointAt(startU));
   const tangent = curve.getTangentAt(startU);
   gantry.rotation.y = Math.atan2(tangent.x, tangent.z);
@@ -214,7 +215,7 @@ export function buildSunsetCircuit(
   }
   box(gantry, span + 0.9, 1.4, 0.65, 0, 6.2, 0, dark);
   box(gantry, span + 0.9, 0.08, 0.7, 0, 5.48, 0, amber);
-  const signMaterial = new THREE.MeshStandardMaterial({ map: signTexture('SUNSET OVAL', '01 / FOREST RACEWAY'), roughness: 0.7 });
+  const signMaterial = new THREE.MeshStandardMaterial({ map: signTexture(signage.title, signage.subtitle), roughness: 0.7 });
   for (const side of [-1, 1]) {
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(8.8, 2.2), signMaterial);
     sign.position.set(0, 6.35, side * 0.34);
@@ -228,7 +229,7 @@ export function buildSunsetCircuit(
 
   // Outside-turn chevrons are oriented toward approaching drivers.
   const chevronMaterial = new THREE.MeshStandardMaterial({ map: signTexture('', '', true), roughness: 0.7, side: THREE.DoubleSide });
-  for (const u of [0.12, 0.36, 0.55, 0.76]) {
+  for (const u of signage.chevrons) {
     const i = Math.floor(u * centers.length);
     const t = curve.getTangentAt(u);
     const ahead = curve.getTangentAt((u + 0.025) % 1);

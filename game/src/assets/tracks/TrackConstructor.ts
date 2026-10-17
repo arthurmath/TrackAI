@@ -13,8 +13,9 @@ import * as THREE from 'three';
 import type { TrackDefinition } from './types';
 import type { VehicleSpawn } from '../../physics/VehicleController';
 import { AssetLoader } from '../../utils/AssetLoader';
-import { buildSunsetCircuit, createSunsetAsphalt } from './SunsetCircuit';
+import { buildRacewayCircuit, createRacewayAsphalt } from './RacewayCircuit';
 import { buildSunsetEnvironment } from './SunsetEnvironment';
+import { tuneStadiumMaterials } from './StadiumEnvironment';
 
 export interface BuiltTrack {
   group: THREE.Group;
@@ -178,6 +179,12 @@ export class TrackConstructor {
     const useGLB = !!def.modelPath;
     const showTrackVisuals = !useGLB || !!def.showProceduralTrack;
     const sunset = def.scenery === 'sunset-park';
+    const raceway = def.roadStyle === 'raceway';
+    const signage = {
+      title: def.name.toUpperCase(),
+      subtitle: sunset ? '01 / FOREST RACEWAY' : '03 / STADIUM RACEWAY',
+      chevrons: sunset ? [0.12, 0.36, 0.55, 0.76] : [0.18, 0.39, 0.61, 0.82],
+    };
 
     const group = new THREE.Group();
     group.name = `track_${def.id}`;
@@ -212,10 +219,10 @@ export class TrackConstructor {
     this.buildRoad(group, trackBody, leftEdge, rightEdge, def, showTrackVisuals);
 
     // --- Barrières ---
-    this.buildBarrier(group, trackBody, leftEdge, def.barrierHeight, 0x3344ff, showTrackVisuals && !sunset);
-    this.buildBarrier(group, trackBody, rightEdge, def.barrierHeight, 0xff3344, showTrackVisuals && !sunset);
-    if (sunset && showTrackVisuals) {
-      buildSunsetCircuit(group, samples, leftEdge, rightEdge, curve, def.roadWidth, def.barrierHeight, def.startU ?? 0);
+    this.buildBarrier(group, trackBody, leftEdge, def.barrierHeight, 0x3344ff, showTrackVisuals && !raceway);
+    this.buildBarrier(group, trackBody, rightEdge, def.barrierHeight, 0xff3344, showTrackVisuals && !raceway);
+    if (raceway && showTrackVisuals) {
+      buildRacewayCircuit(group, samples, leftEdge, rightEdge, curve, def.roadWidth, def.barrierHeight, def.startU ?? 0, signage);
     }
 
     // --- Sol ---
@@ -250,6 +257,7 @@ export class TrackConstructor {
         const modelGroup = gltf.scene.clone();
         const scale = def.modelScale ?? 1;
         modelGroup.scale.setScalar(scale);
+        if (def.id === 'track_3') tuneStadiumMaterials(modelGroup);
         modelGroup.traverse((obj) => {
           if ((obj as THREE.Mesh).isMesh) {
             obj.castShadow = true;
@@ -259,14 +267,16 @@ export class TrackConstructor {
         group.add(modelGroup);
       } else {
         // Fallback : afficher le visuel procédural si le GLB est absent.
-        this.buildRoad(group, trackBody, leftEdge, rightEdge, def, true);
-        this.buildBarrier(group, trackBody, leftEdge, def.barrierHeight, 0x3344ff, !sunset);
-        this.buildBarrier(group, trackBody, rightEdge, def.barrierHeight, 0xff3344, !sunset);
+        if (!showTrackVisuals) {
+          this.buildRoad(group, trackBody, leftEdge, rightEdge, def, true);
+          this.buildBarrier(group, trackBody, leftEdge, def.barrierHeight, 0x3344ff, !raceway);
+          this.buildBarrier(group, trackBody, rightEdge, def.barrierHeight, 0xff3344, !raceway);
+          if (raceway) {
+            buildRacewayCircuit(group, samples, leftEdge, rightEdge, curve, def.roadWidth, def.barrierHeight, startU, signage);
+          }
+        }
         this.buildGround(group, trackBody, def, true);
         if (sunset) {
-          if (!showTrackVisuals) {
-            buildSunsetCircuit(group, samples, leftEdge, rightEdge, curve, def.roadWidth, def.barrierHeight, startU);
-          }
           buildSunsetEnvironment(group, samples, def.roadWidth);
         } else this.buildDecorations(group, def);
       }
@@ -404,7 +414,7 @@ export class TrackConstructor {
     geo.setIndex(indices);
     geo.computeVertexNormals();
 
-    const mat = visible && def.scenery === 'sunset-park' ? createSunsetAsphalt() : new THREE.MeshStandardMaterial({
+    const mat = visible && def.roadStyle === 'raceway' ? createRacewayAsphalt() : new THREE.MeshStandardMaterial({
       color: 0x222222,
       roughness: 0.98,
       metalness: 0.0,

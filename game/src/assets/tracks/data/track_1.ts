@@ -32,6 +32,7 @@ export const track_1: TrackDefinition = {
   groundSize: 700,
   groundColor: 0x657c48,
   scenery: 'sunset-park',
+  roadStyle: 'raceway',
   lighting: {
     skyStyle: 'sunset',
     skyColor: 0x90b7d3,

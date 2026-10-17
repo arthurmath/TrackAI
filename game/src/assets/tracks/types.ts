@@ -73,6 +73,9 @@ export interface TrackDefinition {
   /** Ensemble de décors et de matériaux procéduraux propre au circuit. */
   scenery?: 'sunset-park';
 
+  /** Asphalte texturé, vibreurs et glissières partagés entre les circuits. */
+  roadStyle?: 'raceway';
+
   lighting: TrackLighting;
   /** Sources lumineuses locales (projecteurs, spots de stade, etc.). */
   lights?: TrackPointLight[];

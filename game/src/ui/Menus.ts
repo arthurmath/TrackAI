@@ -30,6 +30,7 @@ const hex = (color: number): string => `#${color.toString(16).padStart(6, '0')}`
 export class Menus {
   private readonly container: HTMLElement;
   private progressFill: HTMLElement | null = null;
+  private screenVersion = 0;
 
   constructor(parent: HTMLElement) {
     this.container = document.createElement('div');
@@ -38,11 +39,13 @@ export class Menus {
   }
 
   hide(): void {
+    this.screenVersion++;
     this.container.innerHTML = '';
     this.container.classList.add('hidden');
   }
 
   private screen(html: string, layout = 'utility', section = 'Paddock', step = 0): HTMLElement {
+    this.screenVersion++;
     this.progressFill = null;
     this.container.classList.remove('hidden');
     this.container.innerHTML = `
@@ -234,14 +237,14 @@ export class Menus {
       <div class="lab-status"><div><span class="status-indicator ${serverRunning ? 'online' : ''}"></span><strong>${serverRunning ? 'Votre équipe est en ligne' : 'Connectez votre équipe'}</strong><span>Le serveur IA pilote les agents et leur entraînement.</span></div>${serverBtnHtml}</div>
       <div class="ai-mode-row">
         <div class="ai-mode-col">
-          <button class="btn lab-choice primary" id="ai-player" aria-pressed="false"><span class="lab-number">01</span><small>OBSERVER</small><strong>Agent pilote</strong><span>Regardez votre agent entraîné prendre le volant.</span>${arrow}</button>
+          <button class="btn lab-choice primary" id="ai-player" aria-pressed="false"><span class="lab-number">01</span><small>INFERENCE</small><strong>Agent pilote</strong><span>Regardez votre agent entraîné piloter.</span>${arrow}</button>
           <div class="ai-panel hidden" id="player-panel">${this.weightPickerHtml('player', weights)}</div>
         </div>
         <div class="ai-mode-col">
-          <button class="btn lab-choice cold" id="train-cold" aria-pressed="false"><span class="lab-number">02</span><small>ENTRAÎNER</small><strong>Partir de zéro</strong><span>Un nouvel agent, une première trajectoire.</span>${arrow}</button>
+          <button class="btn lab-choice cold" id="train-cold" aria-pressed="false"><span class="lab-number">02</span><small>COLD START</small><strong>Partir de zéro</strong><span>Commencer l'entraînement d'un nouveau réseau de neurones.</span>${arrow}</button>
         </div>
         <div class="ai-mode-col">
-          <button class="btn lab-choice warm" id="train-warm" aria-pressed="false"><span class="lab-number">03</span><small>AMÉLIORER</small><strong>Reprendre l’entraînement</strong><span>Continuez à partir de poids sauvegardés.</span>${arrow}</button>
+          <button class="btn lab-choice warm" id="train-warm" aria-pressed="false"><span class="lab-number">03</span><small>WARM START</small><strong>Reprendre l’entraînement</strong><span>Reprendre l'entrainement à partir de poids sauvegardés.</span>${arrow}</button>
           <div class="ai-panel hidden" id="warm-panel">${this.weightPickerHtml('warm', weights)}</div>
         </div>
         <div class="ai-mode-col">
@@ -348,7 +351,9 @@ export class Menus {
   }
 
   private async renderAIGraphs(cb: { onBack: () => void }): Promise<void> {
+    const version = this.screenVersion;
     const files = await Menus.fetchSeriesFiles();
+    if (version !== this.screenVersion) return;
     const fileItems = files.map((f) => ({ value: f, label: f }));
 
     const s = this.screen(`
@@ -375,7 +380,9 @@ export class Menus {
     const showBestInput = s.querySelector<HTMLInputElement>('#graphs-show-best')!;
     const canvas = s.querySelector<HTMLCanvasElement>('#training-chart')!;
 
-    let points: ScorePoint[] = files.length ? await Menus.fetchSeriesData(files[0]) : [];
+    let points: ScorePoint[] = [];
+    let loadVersion = 0;
+    let closed = false;
 
     const chart = attachTrainingChart(
       canvas,
@@ -384,7 +391,10 @@ export class Menus {
     );
 
     const loadFile = async (filename: string): Promise<void> => {
-      points = filename ? await Menus.fetchSeriesData(filename) : [];
+      const request = ++loadVersion;
+      const loaded = filename ? await Menus.fetchSeriesData(filename) : [];
+      if (closed || request !== loadVersion || !canvas.isConnected) return;
+      points = loaded;
       chart.redraw();
     };
 
@@ -399,9 +409,11 @@ export class Menus {
 
     showBestInput.addEventListener('change', chart.redraw);
     s.querySelector('#graphs-back')!.addEventListener('click', () => {
+      closed = true;
       chart.destroy();
       cb.onBack();
     });
+    if (files.length) void loadFile(files[0]);
   }
 
   static async fetchSavedWeights(): Promise<SavedWeight[]> {

@@ -256,6 +256,12 @@ export function getTrackPreview(definition: TrackDefinition): Promise<string> {
       physics = new PhysicsWorld(definition.gravity);
       const lighting = new Lighting(scene);
       lighting.apply(definition.lighting);
+      // A small overview needs readable asphalt even for a night race.
+      // This fill light belongs only to the thumbnail, leaving race lighting intact.
+      const sky = new THREE.Color(definition.lighting.skyColor);
+      if (sky.getHSL({ h: 0, s: 0, l: 0 }).l < 0.15) {
+        scene.add(new THREE.AmbientLight(0xb5c9ef, 1.8));
+      }
       const track = await new TrackConstructor(physics.world, scene, loader).build(definition);
       const bounds = new THREE.Box3().setFromPoints(track.curve.getPoints(240));
       bounds.expandByVector(new THREE.Vector3(definition.roadWidth * 1.4, 5, definition.roadWidth * 1.4));

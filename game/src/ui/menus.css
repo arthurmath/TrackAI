@@ -1,5 +1,8 @@
 /* The paddock: a shared visual language for every menu, isolated from the race HUD. */
 #menus {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
   --menu-orange: #ff713c;
   --menu-lime: #d1f766;
   --menu-purple: #b2a1ff;
@@ -133,7 +136,7 @@
 #menus .showcase-image { position: absolute; inset: 12px 3% 6px; }
 #menus .showcase-caption { position: absolute; left: 24px; right: 24px; bottom: 15px; display: flex; align-items: center; gap: 10px; font-size: 8px; letter-spacing: 1.2px; color: #a5ad9c; }
 #menus .showcase-caption > span:last-child { margin-left: auto; color: #66705e; }
-#menus .vehicle-options { display: grid; gap: 14px; }
+#menus .vehicle-options { display: grid; gap: 14px; grid-auto-rows: minmax(178px, 1fr); max-height: 370px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #69765c transparent; padding: 2px; margin: -2px; }
 #menus .vehicle-card { position: relative; width: 100%; min-height: 178px; display: flex; flex-direction: column; text-align: left; color: #e8ece4; background: #1a1e20; border: 1px solid #ffffff20; border-radius: 5px; padding: 13px 17px; cursor: pointer; overflow: hidden; transition: border-color .18s, background .18s; }
 #menus .vehicle-card:hover { border-color: #ffffff68; }
 #menus .vehicle-card.selected { border-color: var(--menu-lime); background: linear-gradient(130deg, #d1f7660d, #d1f76603); }
@@ -214,6 +217,8 @@
 #menus .btn.lab-choice.warm { --lab-color: var(--menu-orange); background: #27211d; border-color: #ff713c25; }
 #menus .btn.lab-choice.graphs { --lab-color: var(--menu-purple); background: #24212c; border-color: #b2a1ff25; }
 #menus .btn.lab-choice:hover, #menus .btn.lab-choice.active { border-color: var(--lab-color); background: #242a23; box-shadow: none; }
+#menus .btn.lab-choice.primary:not(:disabled):hover,
+#menus .btn.lab-choice.primary.active { background: #242a23; color: #eef2e7; border-color: var(--lab-color); }
 #menus .lab-number { font-size: 42px; color: var(--lab-color); font-style: italic; font-weight: 750; letter-spacing: -2px; opacity: .85; margin-bottom: 25px; }
 #menus .lab-choice small { color: var(--lab-color); font-size: 8px; letter-spacing: 1.3px; margin-bottom: 9px; }
 #menus .lab-choice strong { font-size: 20px; letter-spacing: -.6px; line-height: 1.15; }
@@ -234,6 +239,7 @@
   #menus .mode-card { min-height: 165px; }
   #menus .vehicle-showcase { min-height: 445px; }
   #menus .vehicle-thumb { height: 145px; }
+  #menus .vehicle-options { max-height: 445px; grid-auto-rows: minmax(215px, 1fr); }
 }
 @media (max-width: 1100px) {
   #menus .brand small, #menus .brand-divider { display: none; }
@@ -272,7 +278,7 @@
   #menus .soon-badge { font-size: 6px; right: 9px; }
   #menus .menu-footer > span:nth-child(2) { display: none; }
   #menus .garage-layout { grid-template-columns: 1fr; }
-  #menus .vehicle-options { grid-template-columns: 1fr 1fr; }
+  #menus .vehicle-options { grid-template-columns: 1fr 1fr; max-height: none; grid-auto-rows: auto; overflow: visible; }
   #menus .vehicle-showcase { min-height: 330px; }
   #menus .vehicle-specs { gap: 14px; grid-template-columns: 1.2fr 1fr 1fr; }
   #menus .spec { padding-left: 16px; }
@@ -364,6 +370,40 @@
   #menus .btn.lab-choice { min-height: 215px; }
   #menus .lab-status { padding: 18px; }
   #menus .lab-status .btn { width: 100%; }
+}
+/* Keep the next action visible on common laptop displays. */
+@media (min-width: 801px) and (max-height: 800px) {
+  #menus .menu-header { min-height: 66px; }
+  #menus .menu-footer { min-height: 44px; }
+  #menus .home-hero { min-height: 385px; padding: 26px 0 18px; }
+  #menus h1 { font-size: clamp(65px, 6.8vw, 98px); margin: 18px 0 15px; }
+  #menus .hero-visual { min-height: 355px; }
+  #menus .hero-cta { margin-top: 20px; }
+  #menus .hero-inventory { margin-top: 20px; }
+  #menus .mode-card { min-height: 112px; padding: 20px 18px; }
+  #menus .mode-grid { margin-bottom: 15px; }
+  #menus .controls-guide { margin-bottom: 12px; }
+  #menus .section-heading { padding: 23px 0 20px; }
+  #menus .section-heading h2 { font-size: 50px; margin: 10px 0 8px; }
+  #menus .vehicle-showcase { min-height: 282px; }
+  #menus .vehicle-options { max-height: 282px; grid-auto-rows: minmax(134px, 1fr); }
+  #menus .vehicle-card { min-height: 134px; padding: 10px 15px; }
+  #menus .vehicle-thumb { height: 72px; }
+  #menus .vehicle-specs { margin-top: 17px; padding-bottom: 16px; }
+  #menus .selected-vehicle h3 { font-size: 22px; }
+  #menus .spec strong { font-size: 21px; }
+  #menus .selection-footer { padding: 19px 0; }
+  #menus .track-scene { height: 165px; }
+  #menus .track-card-info { padding: 15px 17px 13px; }
+  #menus .track-card-info > strong { margin: 8px 0 14px; font-size: 21px; }
+  #menus .track-record { margin-top: 15px; padding-top: 10px; }
+  #menus .race-summary { padding: 17px 0; margin-top: 7px; }
+  #menus .btn.lab-choice { min-height: 230px; padding: 21px; }
+  #menus .lab-number { font-size: 35px; margin-bottom: 18px; }
+  #menus .lab-status { margin-bottom: 20px; }
+  #menus .utility-screen .menu-content { gap: 18px; padding: 25px 0; }
+  #menus .utility-screen h2 { font-size: 48px; }
+  #menus .graphs-canvas-wrap { height: 38vh; min-height: 210px; }
 }
 @media (prefers-reduced-motion: reduce) {
   #menus *, #menus *::before, #menus *::after { animation: none !important; transition: none !important; }
