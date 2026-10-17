@@ -108,6 +108,7 @@ export function buildSunsetEnvironment(
   group: THREE.Group,
   samples: THREE.Vector3[],
   roadWidth: number,
+  night = false,
 ): void {
   const environment = new THREE.Group();
   environment.name = 'sunset-nature';
@@ -117,6 +118,8 @@ export function buildSunsetEnvironment(
   // Larger technical layouts need the same flat meadow beneath every corner.
   const flatRadius = Math.max(112, ...samples.map(p => Math.hypot(p.x - center.x, p.z - center.z) + roadWidth / 2 + 8));
   const clearance = roadWidth / 2 + 4;
+  const hillCrestRadius = Math.max(235, flatRadius + 90);
+  const hillOuterRadius = hillCrestRadius + 100;
 
   // Use the complete sampled polyline, including the closing segment, rather
   // than its control points so vegetation cannot encroach on a sweeping bend.
@@ -137,10 +140,12 @@ export function buildSunsetEnvironment(
   };
   const terrainHeight = (x: number, z: number): number => {
     const radial = Math.hypot(x - center.x, z - center.z);
-    const rise = THREE.MathUtils.smoothstep(radial, flatRadius, Math.max(235, flatRadius + 90));
+    const rise = THREE.MathUtils.smoothstep(radial, flatRadius, hillCrestRadius);
+    // The near green hills descend into a valley before the distant range starts.
+    const falloff = night ? 1 - THREE.MathUtils.smoothstep(radial, hillCrestRadius, hillOuterRadius) : 1;
     const waves = 0.5 + 0.24 * Math.sin(x * 0.022 + z * 0.008)
       + 0.18 * Math.cos(z * 0.028 - x * 0.009);
-    return rise * (8 + waves * 48) - 0.012;
+    return rise * falloff * (8 + waves * 48) - 0.012;
   };
 
   // The complete circuit stays level, with only a fine meadow texture.
@@ -172,20 +177,22 @@ export function buildSunsetEnvironment(
   terrain.receiveShadow = true;
   environment.add(terrain);
 
-  // Layered silhouettes are single continuous ridges, rather than oversized cones.
+  // At night, each range has its own radial band, entirely beyond the green hills.
+  // A valley separates the bands so their slopes cannot intersect.
   for (let layer = 0; layer < 2; layer++) {
     const positions: number[] = [];
     const indices: number[] = [];
     const count = 100;
     for (let i = 0; i <= count; i++) {
       const angle = i / count * Math.PI * 2;
-      const radius = 280 + layer * 75;
-      const ridge = 34 + layer * 18 + 13 * Math.sin(angle * 5 + layer * 2)
+      const radius = night ? hillOuterRadius + 125 + layer * 215 : 280 + layer * 75;
+      const slopeWidth = night ? 90 : 70;
+      const ridge = (night ? 95 + layer * 40 : 34 + layer * 18) + 13 * Math.sin(angle * 5 + layer * 2)
         + 8 * Math.sin(angle * 9 - layer) + 4 * Math.cos(angle * 17);
       positions.push(
-        center.x + Math.cos(angle) * (radius - 70), 0, center.z + Math.sin(angle) * (radius - 70),
+        center.x + Math.cos(angle) * (radius - slopeWidth), 0, center.z + Math.sin(angle) * (radius - slopeWidth),
         center.x + Math.cos(angle) * radius, ridge, center.z + Math.sin(angle) * radius,
-        center.x + Math.cos(angle) * (radius + 80), -3, center.z + Math.sin(angle) * (radius + 80),
+        center.x + Math.cos(angle) * (radius + (night ? slopeWidth : 80)), -3, center.z + Math.sin(angle) * (radius + (night ? slopeWidth : 80)),
       );
       if (i < count) {
         const a = i * 3;
@@ -198,7 +205,10 @@ export function buildSunsetEnvironment(
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
     const ridge = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
-      color: layer === 0 ? 0x768775 : 0x8d9c96, roughness: 1, side: THREE.DoubleSide,
+      color: night
+        ? (layer === 0 ? 0x111a2b : 0x162139)
+        : (layer === 0 ? 0x768775 : 0x8d9c96),
+      roughness: 1, side: THREE.DoubleSide,
     }));
     ridge.name = `sunset-ridge-${layer}`;
     environment.add(ridge);

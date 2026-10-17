@@ -232,7 +232,7 @@ export class TrackConstructor {
 
     // --- Décor (ignoré quand le GLB fournit l'environnement) ---
     if (!useGLB) {
-      if (park) buildSunsetEnvironment(group, samples, def.roadWidth);
+      if (park) buildSunsetEnvironment(group, samples, def.roadWidth, midnight);
       else this.buildDecorations(group, def);
     }
 
@@ -279,7 +279,7 @@ export class TrackConstructor {
         }
         this.buildGround(group, trackBody, def, true);
         if (park) {
-          buildSunsetEnvironment(group, samples, def.roadWidth);
+          buildSunsetEnvironment(group, samples, def.roadWidth, midnight);
         } else this.buildDecorations(group, def);
       }
     }

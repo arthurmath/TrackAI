@@ -49,7 +49,8 @@ export const track_2: TrackDefinition = {
     groundColor: 0x344239,
     fogColor: 0x18243c,
     fogNear: 170,
-    fogFar: 540,
+    // The distant ranges sit beyond the near green hills.
+    fogFar: 1000,
     ambientColor: 0x9baacb,
     ambientIntensity: 0.65,
     hemiIntensity: 0.8,

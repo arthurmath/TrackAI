@@ -261,9 +261,9 @@ export function getTrackPreview(definition: TrackDefinition): Promise<string> {
       const sky = new THREE.Color(definition.lighting.skyColor);
       if (sky.getHSL({ h: 0, s: 0, l: 0 }).l < 0.15) {
         if (definition.id === 'track_2') {
-          // Neutral fill and moonlight reveal Midnight's asphalt and surroundings.
-          scene.add(new THREE.AmbientLight(0xffffff, 3));
-          const moon = new THREE.DirectionalLight(0xc8d8ff, 5);
+          // Soft blue fill preserves Midnight's night atmosphere in the overview.
+          scene.add(new THREE.AmbientLight(0x8196cf, 0.25));
+          const moon = new THREE.DirectionalLight(0xc8d8ff, 0.5);
           moon.position.set(-80, 140, 60);
           scene.add(moon);
         } else {
