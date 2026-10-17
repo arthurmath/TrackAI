@@ -114,7 +114,7 @@ export class TrainingDashboard {
     const lastScore = m.scores.length ? m.scores[m.scores.length - 1] : null;
     const lastReward = m.rewards.length ? m.rewards[m.rewards.length - 1] : null;
 
-    this.els.lap.textContent = m.bestLapMs != null ? formatTime(m.bestLapMs) : '—';
+    this.els.lap.textContent = m.bestLapMs != null ? formatTime(m.bestLapMs).slice(0, -1) : '—';
     this.els.trainings.textContent = String(m.trainings);
     this.els.best.textContent = m.bestProgress.toFixed(2);
     this.els.avg.textContent = lastScore ? lastScore.avg_progress.toFixed(2) : '—';

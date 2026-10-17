@@ -21,14 +21,14 @@ function computeYRange(values: number[]): { yMin: number; yMax: number } {
   if (yMin === yMax) {
     const pad = Math.max(0.02, yMax * Y_PADDING);
     yMin = Math.max(0, yMin - pad);
-    yMax = Math.min(1, yMax + pad);
+    yMax += pad;
   } else {
     const span = yMax - yMin;
     yMin = Math.max(0, yMin - span * Y_PADDING);
-    yMax = Math.min(1, yMax + span * Y_PADDING);
+    yMax += span * Y_PADDING;
   }
 
-  if (yMax - yMin < 0.01) yMax = Math.min(1, yMin + 0.01);
+  if (yMax - yMin < 0.01) yMax = yMin + 0.01;
   return { yMin, yMax };
 }
 
