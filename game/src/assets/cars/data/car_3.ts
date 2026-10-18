@@ -14,12 +14,14 @@ export const car_3: VehicleConfig = {
   centerOfMassOffset: { x: 0, y: -0.20 * SIZE_SCALE, z: 0 },
   suspensionRestLength: car_1.suspensionRestLength * SIZE_SCALE,
   maxSuspensionTravel: car_1.maxSuspensionTravel * SIZE_SCALE,
-  wheelRadius: 0.386 * SIZE_SCALE,
+  // Rayon mesuré sur le GLB avec modelScale = 0.84, avant SIZE_SCALE.
+  wheelRadius: 0.3601 * SIZE_SCALE,
   wheelConnections: [
-    { x: -0.895, y: 0.074, z: 1.598, steering: true, powered: false },
-    { x: 0.896, y: 0.074, z: 1.598, steering: true, powered: false },
-    { x: -0.907, y: 0.074, z: -1.562, steering: false, powered: true },
-    { x: 0.908, y: 0.074, z: -1.562, steering: false, powered: true },
+    // Origines des roues du GLB dans le châssis, plus la suspension au repos en Y.
+    { x: -0.836126, y: 0.046385, z: 1.491717, steering: true, powered: false },
+    { x: 0.836103, y: 0.046385, z: 1.491712, steering: true, powered: false },
+    { x: -0.847122, y: 0.046384, z: -1.457942, steering: false, powered: true },
+    { x: 0.846826, y: 0.046384, z: -1.457943, steering: false, powered: true },
   ].map(wheel => ({
     ...wheel,
     x: wheel.x * SIZE_SCALE,

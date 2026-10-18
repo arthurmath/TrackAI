@@ -170,8 +170,8 @@ export class VehicleController {
     const speedFactor = 1 / (1 + speed * 0.0025);
     const targetSteering = -control.steer * cfg.maxSteering * speedFactor;
     // Réactivité du braquage réduite de 15 % à toutes les vitesses, à angle cible identique.
-    // Réduction supplémentaire progressive de 100 à 200 km/h, jusqu'à 50 %.
-    const highSpeedResponse = 1 - 0.5 * THREE.MathUtils.smoothstep(speed * 3.6, 100, 200);
+    // Réduction supplémentaire progressive de 50 à 200 km/h, jusqu'à 50 %.
+    const highSpeedResponse = 1 - 0.5 * THREE.MathUtils.smoothstep(speed * 3.6, 50, 200);
     const steeringResponse = 6 * 0.85 * highSpeedResponse;
     // Retour au centre inchangé.
     const steerLerp = control.steer === 0 ? 8 * dt : steeringResponse * dt;

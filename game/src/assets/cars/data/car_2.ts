@@ -16,13 +16,15 @@ export const car_2: VehicleConfig = {
     suspensionStiffness: 32,
     suspensionDamping: 4.0,
     maxSuspensionTravel: 0.28,
+    // Centres des pneus du GLB après échelle, rotation et inclinaison visuelle.
+    // L'attache est au-dessus du centre de la longueur de suspension au repos.
     wheelConnections: [
-        { x: -0.85, y: -0.25, z: 1.35, steering: true, powered: false },
-        { x: 0.85, y: -0.25, z: 1.35, steering: true, powered: false },
-        { x: -0.85, y: -0.25, z: -1.35, steering: false, powered: true },
-        { x: 0.85, y: -0.25, z: -1.35, steering: false, powered: true },
+        { x: -0.595625, y: -0.329558, z: 0.945156, steering: true, powered: false },
+        { x: 0.615686, y: -0.329972, z: 0.945144, steering: true, powered: false },
+        { x: -0.672446, y: -0.392057, z: -1.600765, steering: false, powered: true },
+        { x: 0.631906, y: -0.374006, z: -1.601040, steering: false, powered: true },
     ],
-    wheelRadius: 0.38,
+    wheelRadius: 0.30,
     wheelFriction: 2.2,
     lateralFriction: 1.1,
     maxSteering: 0.82,
