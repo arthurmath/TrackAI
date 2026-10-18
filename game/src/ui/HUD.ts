@@ -23,6 +23,7 @@ export class HUD {
   private readonly bestEl: HTMLElement;
   private readonly deltaEl: HTMLElement;
   private readonly speedValueEl: HTMLElement;
+  private readonly speedAverageLabelEl: HTMLElement;
   private readonly arcFg: SVGPathElement;
   private readonly arcLength: number;
   private trainingBar: HTMLElement | null = null;
@@ -57,6 +58,7 @@ export class HUD {
           <div class="speedo-readout">
             <div class="speed-value"><span id="hud-speed">0</span></div>
             <div class="speed-unit">KM/H</div>
+            <div class="speed-average-label hidden">Vitesse moyenne des voitures</div>
           </div>
         </div>
       </div>
@@ -68,6 +70,7 @@ export class HUD {
     this.bestEl = this.root.querySelector('#hud-best')!;
     this.deltaEl = this.root.querySelector('#hud-delta')!;
     this.speedValueEl = this.root.querySelector('#hud-speed')!;
+    this.speedAverageLabelEl = this.root.querySelector('.speed-average-label')!;
 
     const bg = this.root.querySelector('#speedo-bg') as SVGPathElement;
     this.arcFg = this.root.querySelector('#speedo-fg') as SVGPathElement;
@@ -90,6 +93,7 @@ export class HUD {
 
   showTrainingControls(onStop: () => void): void {
     this.hideTrainingControls();
+    this.speedAverageLabelEl.classList.remove('hidden');
     this.trainingBar = document.createElement('div');
     this.trainingBar.className = 'hud-training';
     this.trainingBar.innerHTML =
@@ -101,6 +105,7 @@ export class HUD {
   hideTrainingControls(): void {
     this.trainingBar?.remove();
     this.trainingBar = null;
+    this.speedAverageLabelEl.classList.add('hidden');
   }
 
   update(snap: RaceSnapshot, speedKmh: number): void {

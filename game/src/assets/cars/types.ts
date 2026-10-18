@@ -43,7 +43,6 @@ export interface VehicleConfig {
   maxSteering: number; // radians
   engineForce: number;
   brakeForce: number;
-  handbrakeForce: number;
   /** Vitesse max approximative (m/s) — utilisée pour limiter la force moteur. */
   maxSpeed: number;
 

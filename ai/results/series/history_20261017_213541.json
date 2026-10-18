@@ -1,0 +1,106 @@
+{
+  "scores_history": [
+    {
+      "iteration": 4,
+      "avg_progress": 0.3656249999999981,
+      "best_progress": 1.1359374999999923
+    },
+    {
+      "iteration": 5,
+      "avg_progress": 1.9999999999999494,
+      "best_progress": 1.9999999999999494
+    },
+    {
+      "iteration": 6,
+      "avg_progress": 2.493749999999915,
+      "best_progress": 2.493749999999915
+    },
+    {
+      "iteration": 7,
+      "avg_progress": 2.999999999999912,
+      "best_progress": 2.999999999999912
+    },
+    {
+      "iteration": 8,
+      "avg_progress": 3.9999999999998463,
+      "best_progress": 3.9999999999998463
+    },
+    {
+      "iteration": 9,
+      "avg_progress": 3.324999999999868,
+      "best_progress": 3.9999999999998463
+    },
+    {
+      "iteration": 10,
+      "avg_progress": 3.9999999999998375,
+      "best_progress": 3.9999999999998463
+    },
+    {
+      "iteration": 11,
+      "avg_progress": 4.179687499999866,
+      "best_progress": 4.179687499999866
+    },
+    {
+      "iteration": 12,
+      "avg_progress": 4.437499999999927,
+      "best_progress": 4.437499999999927
+    },
+    {
+      "iteration": 13,
+      "avg_progress": 5.075000000000072,
+      "best_progress": 5.075000000000072
+    }
+  ],
+  "rewards_history": [
+    {
+      "iteration": 4,
+      "avg_reward": -0.28631840417856635,
+      "best_reward": 0.165073099136352
+    },
+    {
+      "iteration": 5,
+      "avg_reward": 0.06598253198362884,
+      "best_reward": 8.41766336387396
+    },
+    {
+      "iteration": 6,
+      "avg_reward": 0.05614465012397008,
+      "best_reward": 0.16467451858520732
+    },
+    {
+      "iteration": 7,
+      "avg_reward": 0.02705487641115359,
+      "best_reward": 42.63625
+    },
+    {
+      "iteration": 8,
+      "avg_reward": 0.08652116261982973,
+      "best_reward": 26.073749999999997
+    },
+    {
+      "iteration": 9,
+      "avg_reward": -0.09521609912463354,
+      "best_reward": 0.3113459415435724
+    },
+    {
+      "iteration": 10,
+      "avg_reward": 0.06524934745768372,
+      "best_reward": 9.011250000000004
+    },
+    {
+      "iteration": 11,
+      "avg_reward": 0.09072074898351844,
+      "best_reward": 0.3216549224853518
+    },
+    {
+      "iteration": 12,
+      "avg_reward": 0.08975979215182699,
+      "best_reward": 0.3195782108306929
+    },
+    {
+      "iteration": 13,
+      "avg_reward": 0.052962742781116325,
+      "best_reward": 0.31927734184265577
+    }
+  ]
+}

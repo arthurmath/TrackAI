@@ -710,6 +710,15 @@ body {
   letter-spacing: 2px;
 }
 
+.speed-average-label {
+  margin-top: 4px;
+  transform: translateY(33px);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 #debug-overlay {
   position: absolute;
   top: 22px;

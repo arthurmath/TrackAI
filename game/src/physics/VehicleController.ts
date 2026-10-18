@@ -30,6 +30,12 @@ export interface VehicleSpawn {
 // en entraînement multi-agents, chaque voiture est un « fantôme » indépendant.
 const GROUP_TRACK = 0x0001;
 const GROUP_CAR = 0x0002;
+// Adhérence arrière conservée pendant un dérapage, commune aux deux freins.
+const DRIFT_REAR_GRIP = 0.35;
+// Limite de vitesse de rotation (rad/s), abaissée à mesure que la voiture accélère.
+// Elle ne dépend pas de l'angle : maintenir le frein permet toujours de tourner davantage.
+const DRIFT_MAX_YAW_RATE = 2.4;
+const DRIFT_YAW_SPEED_SCALE = 25; // m/s
 /** Groupes des colliders voiture ET des rayons (suspension, capteurs). */
 export const CAR_INTERACTION_GROUP = (GROUP_CAR << 16) | GROUP_TRACK;
 
@@ -39,7 +45,9 @@ export class VehicleController {
   private readonly collider: RAPIER.Collider;
   private readonly poweredWheels: number[] = [];
   private readonly steeredWheels: number[] = [];
+  private readonly rearWheels: number[] = [];
   private currentSteering = 0;
+  private drifting = false;
   private spawn: VehicleSpawn;
 
   // Buffers réutilisés pour éviter les allocations par frame.
@@ -112,6 +120,7 @@ export class VehicleController {
       this.vehicle.setWheelSideFrictionStiffness(i, config.lateralFriction);
       if (w.powered) this.poweredWheels.push(i);
       if (w.steering) this.steeredWheels.push(i);
+      if (w.z < 0) this.rearWheels.push(i);
     });
   }
 
@@ -151,10 +160,15 @@ export class VehicleController {
       const powerCurve = 1 - Math.min(1, speed / cfg.maxSpeed) * 0.6;
       engine = overMax ? 0 : control.throttle * cfg.engineForce * powerCurve;
     }
-    if (control.brake > 0) {
-      if (this.forwardSpeed > 0.5) {
-        // En marche avant : le bouton freine.
-        brake = control.brake * cfg.brakeForce;
+    const brakeInput = Math.max(control.brake, Number(control.handbrake));
+    // Le virage amorce la glisse en marche avant ; en marche arrière, Bas
+    // doit rester une commande moteur même si le joueur tourne.
+    this.drifting = brakeInput > 0 && this.forwardSpeed > 0.5
+      && (this.drifting || control.steer !== 0);
+    if (brakeInput > 0) {
+      if (this.forwardSpeed > 0.5 || control.throttle > 0 || control.handbrake) {
+        // Les deux touches freinent pareil ; seul Bas peut engager la marche arrière.
+        brake = brakeInput * cfg.brakeForce;
       } else {
         // À l'arrêt / en arrière : marche arrière.
         engine = -control.brake * cfg.engineForce * 0.5;
@@ -167,21 +181,33 @@ export class VehicleController {
       this.vehicle.setWheelBrake(i, brake);
     }
 
-    // --- Frein à main : forte friction frein sur l'arrière (dérapage) ---
-    if (control.handbrake) {
-      for (const i of this.poweredWheels) {
-        this.vehicle.setWheelBrake(i, cfg.handbrakeForce);
-        // Réduit la friction latérale arrière pour autoriser un dérapage contrôlé.
-        this.vehicle.setWheelSideFrictionStiffness(i, cfg.lateralFriction * 0.45);
-      }
-    } else {
-      for (const i of this.poweredWheels) {
-        this.vehicle.setWheelSideFrictionStiffness(i, cfg.lateralFriction);
-      }
+    // --- Dérapage : frein + direction, indépendamment de l'accélérateur ---
+    const rearGrip = this.drifting ? DRIFT_REAR_GRIP : 1;
+    for (const i of this.rearWheels) {
+      // Aucun retour de grip en fonction de l'angle tant que le frein reste appuyé.
+      this.vehicle.setWheelFrictionSlip(i, cfg.wheelFriction * rearGrip);
     }
 
     // filterGroups : les rayons de suspension ignorent les autres voitures.
     this.vehicle.updateVehicle(dt, undefined, CAR_INTERACTION_GROUP);
+
+    if (this.drifting && this.wheelsInContact() >= 2) {
+      const rotation = this.body.rotation();
+      this._q.set(rotation.x, rotation.y, rotation.z, rotation.w);
+      this._v.set(0, 1, 0).applyQuaternion(this._q);
+      const angularVelocity = this.body.angvel();
+      const yawRate = this._v.dot(angularVelocity);
+      const maxYawRate = DRIFT_MAX_YAW_RATE / (1 + speed / DRIFT_YAW_SPEED_SCALE);
+      const correction = yawRate - THREE.MathUtils.clamp(yawRate, -maxYawRate, maxYawRate);
+      if (correction !== 0) {
+        // Modifier uniquement le lacet, sans toucher au roulis ni au tangage.
+        this.body.setAngvel({
+          x: angularVelocity.x - this._v.x * correction,
+          y: angularVelocity.y - this._v.y * correction,
+          z: angularVelocity.z - this._v.z * correction,
+        }, true);
+      }
+    }
   }
 
   /** Transform du châssis pour le rendu. */
@@ -244,6 +270,7 @@ export class VehicleController {
   respawn(spawn?: VehicleSpawn): void {
     const s = spawn ?? this.spawn;
     this.currentSteering = 0;
+    this.drifting = false;
     this.body.setTranslation({ x: s.position.x, y: s.position.y, z: s.position.z }, true);
     this.body.setRotation({ x: s.quaternion.x, y: s.quaternion.y, z: s.quaternion.z, w: s.quaternion.w }, true);
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);

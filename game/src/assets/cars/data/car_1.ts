@@ -25,7 +25,6 @@ export const car_1: VehicleConfig = {
   maxSteering: 0.82,
   engineForce: 9200,
   brakeForce: 160,
-  handbrakeForce: 420,
   maxSpeed: 82,
   centerOfMassOffset: { x: 0, y: -0.32, z: 0 },
 };

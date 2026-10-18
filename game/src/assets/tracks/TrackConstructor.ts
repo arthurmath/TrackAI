@@ -228,7 +228,9 @@ export class TrackConstructor {
     }
 
     // --- Sol ---
-    this.buildGround(group, trackBody, def, !useGLB);
+    // Park scenery already supplies the full meadow mesh. Keep only the base
+    // collider: the two flat surfaces are 8 mm apart and z-fight when zoomed out.
+    this.buildGround(group, trackBody, def, !useGLB && !park);
 
     // --- Décor (ignoré quand le GLB fournit l'environnement) ---
     if (!useGLB) {
@@ -277,7 +279,7 @@ export class TrackConstructor {
             buildRacewayCircuit(group, samples, leftEdge, rightEdge, curve, def.roadWidth, def.barrierHeight, startU, signage);
           }
         }
-        this.buildGround(group, trackBody, def, true);
+        this.buildGround(group, trackBody, def, !park);
         if (park) {
           buildSunsetEnvironment(group, samples, def.roadWidth, midnight);
         } else this.buildDecorations(group, def);

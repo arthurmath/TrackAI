@@ -46,13 +46,12 @@ export class TrainingDashboard {
     this.root.innerHTML = `
       <h3>Entraînement · live</h3>
       <div class="td-stats">
-        <div class="td-stat"><div class="v" id="td-lap">—</div><div class="k">Meilleur tour</div></div>
-        <div class="td-stat"><div class="v" id="td-best">0.00</div><div class="k">Meilleur (tours)</div></div>
-        <div class="td-stat"><div class="v" id="td-trainings">0</div><div class="k">Entraînements</div></div>
-        <div class="td-stat"><div class="v" id="td-avg">—</div><div class="k">Progrès moy.</div></div>
-        <div class="td-stat"><div class="v" id="td-reward">—</div><div class="k">Récomp. moy.</div></div>
         <div class="td-stat"><div class="v" id="td-cars">0</div><div class="k">Voitures</div></div>
+        <div class="td-stat"><div class="v" id="td-lap">—</div><div class="k">Meilleur tour</div></div>
+        <div class="td-stat"><div class="v" id="td-avg">—</div><div class="k">Progrès moy.</div></div>
+        <div class="td-stat"><div class="v" id="td-trainings">0</div><div class="k">Entraînements</div></div>
         <div class="td-stat"><div class="v" id="td-rate">0</div><div class="k">Récept./s</div></div>
+        <div class="td-stat"><div class="v" id="td-reward">—</div><div class="k">Récomp. moy.</div></div>
       </div>
       <div class="td-bar"><div class="td-bar-fill" id="td-bar-fill"></div></div>
       <div class="td-bar-label" id="td-bar-label">Prochain entraînement</div>
@@ -65,7 +64,6 @@ export class TrainingDashboard {
     this.els = {
       lap: this.root.querySelector('#td-lap')!,
       trainings: this.root.querySelector('#td-trainings')!,
-      best: this.root.querySelector('#td-best')!,
       avg: this.root.querySelector('#td-avg')!,
       reward: this.root.querySelector('#td-reward')!,
       cars: this.root.querySelector('#td-cars')!,
@@ -114,9 +112,10 @@ export class TrainingDashboard {
     const lastScore = m.scores.length ? m.scores[m.scores.length - 1] : null;
     const lastReward = m.rewards.length ? m.rewards[m.rewards.length - 1] : null;
 
-    this.els.lap.textContent = m.bestLapMs != null ? formatTime(m.bestLapMs).slice(0, -1) : '—';
+    this.els.lap.textContent = m.bestLapMs != null
+      ? formatTime(m.bestLapMs).replace(/^0(?=0:)/, '').slice(0, -1)
+      : '—';
     this.els.trainings.textContent = String(m.trainings);
-    this.els.best.textContent = m.bestProgress.toFixed(2);
     this.els.avg.textContent = lastScore ? lastScore.avg_progress.toFixed(2) : '—';
     this.els.reward.textContent = lastReward ? lastReward.avg_reward.toFixed(1) : '—';
     this.els.cars.textContent = String(m.connections);

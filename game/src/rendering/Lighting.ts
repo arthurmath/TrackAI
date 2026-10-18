@@ -108,8 +108,10 @@ export class Lighting {
     this.sun.shadow.camera.right = d;
     this.sun.shadow.camera.top = d;
     this.sun.shadow.camera.bottom = -d;
-    this.sun.shadow.bias = -0.0004;
-    this.sun.shadow.normalBias = 0.02;
+    // Bias is normalized over the 599 m shadow depth range: a large negative
+    // value detaches shadows from the ground, especially with a low sun.
+    this.sun.shadow.bias = -0.00001;
+    this.sun.shadow.normalBias = 0.005;
 
     this.ambient = new THREE.AmbientLight(0xffffff, 0.4);
     this.hemi = new THREE.HemisphereLight(0xbfd8ff, 0x586247, 0.6);

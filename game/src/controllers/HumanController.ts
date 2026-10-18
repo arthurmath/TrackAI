@@ -16,13 +16,12 @@ export class HumanController implements Controller {
   }
 
   sample(): ControlState {
-    const throttleAxis = this.input.throttleAxis;
     const steer = this.input.steerAxis;
     const reset = this.resetRequested;
     this.resetRequested = false;
     return {
-      throttle: Math.max(0, throttleAxis),
-      brake: Math.max(0, -throttleAxis),
+      throttle: this.input.throttle,
+      brake: this.input.brake,
       steer,
       handbrake: this.input.handbrake,
       reset,

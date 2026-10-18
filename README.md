@@ -17,7 +17,19 @@ uv run main.py
 
 ## Architecture
 
-Jeu de course automobile 3D construit pour le web. Le point d'entrée `main.ts` orchestre les systèmes persistants ; chaque course est encapsulée dans une `RaceSession`.
+Jeu de course automobile 3D construit pour le web. Le point d'entrée `main.ts` orchestre les systèmes persistants ; chaque course est encapsulée dans une `RaceSession` jettable.
+
+
+### Boucle principale
+
+`App.start()` initialise le menu puis démarre la boucle avec `this.loop.start()`. La boucle elle-même est implémentée dans GameLoop.ts:23 : start() demande une première image au navigateur avec requestAnimationFrame(this.tick). À chaque image, tick() se redemande via requestAnimationFrame, avance la physique à pas fixe avec fixedUpdate, puis appelle render pour dessiner la scène.
+
+La boucle `GameLoop` gère les images de toute l’application, des menus au jeu principal.
+
+La course n’a pas sa propre boucle. `RaceSession` est créée quand l’application démarre une course, dans main.ts:203. Ensuite, `App.fixedUpdate()` vérifie qu’une session existe et lui transmet chaque pas physique avec `this.session.fixedUpdate(dt, racing)` (main.ts:274). C’est là que la session fait avancer la course.
+
+Donc le chemin est : `GameLoop.tick()` → `App.fixedUpdate()` → `RaceSession.fixedUpdate()`. Dans les menus, il n’y a pas de `RaceSession` active, donc la course n’avance pas.
+
 
 ### Stack
 
@@ -130,6 +142,22 @@ flowchart LR
 Chaque frame, `RaceSession` peut pousser une observation (position, capteurs raycast, progression) vers `AIController`, qui relaie les actions reçues du serveur externe.
 
 
+## Conduite 
+
+### Acceleration
+
+Quand tu maintiens **↑**, le jeu lit la touche comme un accélérateur numérique à pleine puissance : `throttle = 1`. Ce signal est transmis au contrôleur de la voiture, qui applique une force moteur aux roues motrices via le modèle de véhicule à roues simulées par raycast de Rapier.
+
+La force diminue avec la vitesse. Le code calcule :
+
+`F_moteur = 9200 × (1 − 0,6 × min(1, v / v_max))`
+
+Pour la voiture configurée dans le jeu, `v_{max}=82 m/s`, soit environ **295 km/h**. La force vaut donc 9 200 à l’arrêt, puis baisse progressivement jusqu’à 40 % de cette valeur à la vitesse maximale. Elle est répartie entre les roues motrices, qui sont les deux roues arrière dans cette configuration. Au seuil maximal, le moteur cesse de pousser.
+
+La vitesse obtenue ne vient pas d’une accélération fixée directement : elle résulte de cette force appliquée aux roues, de leur adhérence, de la masse de la voiture (1 000 kg) et de la dynamique du véhicule calculée par Rapier. Le châssis a aussi un amortissement linéaire, qui freine légèrement son mouvement.
+
+En pratique, c’est donc un modèle de conduite simplifié : pas de régime moteur, de vitesses ou de courbe de couple détaillée. La courbe de force est définie dans VehicleController.ts:145, la touche ↑ dans InputManager.ts:36, et les paramètres du véhicule dans car_1.ts:10.
+
 
 
 
@@ -141,10 +169,11 @@ Chaque frame, `RaceSession` peut pousser une observation (position, capteurs ray
 
 ## Backlog : 
 
-- Boost après un dérapage ? 
+- problème d'alignement des roues
+- on ne peut pas assez tourner à haute vitesse
+- Ajouter les 3 caméras, toggle avec "c"
 - Ajouter un ou deux points de visée (lookahead): direction vers un point sur la courbe centrale 10 /25m devant. Comme ça l'agent voit le virage. (a faire avant le système de checkpoints)
-- Track : changements d'altitude, des virages inclinés, un saut/une rampe, et une boucle ou un boost pad si possible.
-- **Contrôle de l'assiette en vol** réglage de l'assiette (tangage) et du roulis en plein vol, à la manière de Trackmania.
+- Track : changements d'altitude, des virages inclinés, un saut/une rampe, et une boucle ou un boost pad si possible. **Contrôle de l'assiette en vol** réglage de l'assiette (tangage) et du roulis en plein vol, à la manière de Trackmania.
 - **Plateformes de boost** et **surfaces modifiant la vitesse** (par exemple, zones à faible adhérence / de terre) en option.
 - **4 roues** avec paramètres configurables : suspension travel, stiffness, damping, friction. Animation des roues : rotation de direction sur les roues avant + rotation de roulement sur toutes les roues en fonction de la vitesse.
 - Faire un menu système solaire, l'utilisateur peut choisir la planète et, pour chaque planète, il y aura un stade d'entrainement pour tester la gravité, les mécaniques de jeu etc. et plusieurs circuits dans cet environnement. La dernière track du jeu sera un parcours multi planètes à la course arc en ciel Mariokart avec une fin dans le soleil ou trou noir. 
@@ -159,21 +188,6 @@ Chaque frame, `RaceSession` peut pousser une observation (position, capteurs ray
 - Prévoir un cycle jour/nuit 
 - Détection de voiture retournée pendant > 2s
 - Respawn au début du circuit avec vitesse nulle (animation de fondu)
+- Multijoueur
 
 
-
-
-## Notes d'intégration Sketchfab
-
-Lors de l'import d'un modèle Sketchfab :
-1. Télécharger en format **glTF** (pas FBX, pas OBJ)
-2. Vérifier que les textures sont bien packagées dans le GLB (`Export as GLB`)
-3. Dans Blender : recentrer l'origine, appliquer les transformations (`Ctrl+A → All Transforms`), réorienter si nécessaire (`Y vers le haut = Z-up dans Three.js`)
-4. Exporter avec Draco compression (`Blender glTF exporter → Geometry → Draco`)
-
-
-
-
-## Questions : 
-
-Demander quel algorithme de Reinforcement Learning est le plus adapté à ce jeu 

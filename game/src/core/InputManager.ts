@@ -32,12 +32,13 @@ export class InputManager {
     return this.pressed.has(code);
   }
 
-  /** Axe accélération (-1 freinage/arrière .. +1 accélération). */
-  get throttleAxis(): number {
-    let v = 0;
-    if (this.isDown('KeyZ') || this.isDown('ArrowUp') || this.isDown('KeyW')) v += 1;
-    if (this.isDown('KeyS') || this.isDown('ArrowDown')) v -= 1;
-    return v;
+  /** Accélération et frein indépendants pour permettre leur appui simultané. */
+  get throttle(): number {
+    return Number(this.isDown('KeyZ') || this.isDown('ArrowUp') || this.isDown('KeyW'));
+  }
+
+  get brake(): number {
+    return Number(this.isDown('KeyS') || this.isDown('ArrowDown'));
   }
 
   /** Axe direction (-1 gauche .. +1 droite). */

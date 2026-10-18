@@ -275,7 +275,8 @@ export class RaceSession {
     return this.primary.renderQuat;
   }
   get speedKmh(): number {
-    return this.primary.vehicle.speedKmh;
+    const totalSpeedKmh = this.agents.reduce((total, agent) => total + agent.vehicle.speedKmh, 0);
+    return this.agents.length > 0 ? totalSpeedKmh / this.agents.length : 0;
   }
   get speed01(): number {
     return Math.min(1, this.primary.vehicle.speedKmh / 320);
