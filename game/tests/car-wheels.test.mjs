@@ -242,7 +242,8 @@ test('F1 and Trackmania front wheels follow turn curvature as speed increases', 
             for (let i = 0; i < 4; i++) vehicle.vehicle.setWheelSteering(i, i < 2 ? steer : 0);
             vehicle.getWheelTransforms(wheels);
             view.update(origin, identity, wheels);
-            const expected = speed === 0 ? steer * (config.visualSteerScale ?? 1) : Math.atan(wheelbase * yaw / speed);
+            const commanded = steer * (config.visualSteerScale ?? 1);
+            const expected = speed === 0 ? commanded : .2 * commanded + .8 * Math.atan(wheelbase * yaw / speed);
             frontNames.forEach((name, i) => {
               assert.ok(Math.abs(view.group.getObjectByName(name).rotation.y - expected) < 1e-6, `${config.id}, ${name}, ${speed} m/s`);
               assert.equal(wheels[i].steering, steer, 'Rendering must preserve physical steering');
@@ -252,7 +253,8 @@ test('F1 and Trackmania front wheels follow turn curvature as speed increases', 
             angles.push(Math.abs(wheels[0].visualSteering));
           }
           assert.ok(angles[3] < angles[2] && angles[2] < angles[1] && angles[1] < angles[0]);
-          assert.ok(angles[3] < angles[0] * .1, 'Fast turns visibly reduce front wheel angle');
+          assert.ok(angles[3] > angles[0] * .2 && angles[3] < angles[0] * .3,
+            'Fast turns reduce steering while retaining a visible fraction of the commanded angle');
           vehicle.drifting = true;
           vehicle.getWheelTransforms(wheels);
           assert.equal(wheels[0].visualSteering, steer * (config.visualSteerScale ?? 1));

@@ -40,8 +40,9 @@ export class CameraController {
    * @param carQuat orientation monde de la voiture
    * @param speed vitesse (m/s) pour le FOV
    * @param dt delta temps de rendu
+   * @param chaseHeightOffset correction verticale propre au véhicule (mètres)
    */
-  update(carPos: THREE.Vector3, carQuat: THREE.Quaternion, speed: number, dt: number): void {
+  update(carPos: THREE.Vector3, carQuat: THREE.Quaternion, speed: number, dt: number, chaseHeightOffset = 0): void {
     const mode = this.mode;
 
     if (mode === 'hood') {
@@ -60,6 +61,10 @@ export class CameraController {
       this.desiredPos.copy(carPos).add(this._offset);
       this.lookTarget.copy(carPos);
       this.lookTarget.y += CAMERA_CONFIG.chaseLookAtHeight;
+      if (mode === 'chase') {
+        this.desiredPos.y += chaseHeightOffset;
+        this.lookTarget.y += chaseHeightOffset;
+      }
 
       if (!this.initialized) {
         this.camera.position.copy(this.desiredPos);

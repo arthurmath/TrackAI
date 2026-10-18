@@ -169,28 +169,14 @@ En pratique, c’est donc un modèle de conduite simplifié : pas de régime mot
 
 ## Backlog : 
 
-quand je vais vite et que je tourne, j'ai l'impression que ça réduit ma vitesse. 
-réduire le dezoom quand on va vite
 j'ai l'impression que les roues arrière glissent
-mettre un eboule noire dans le cockpit de la voiture trackmania
-- problème d'alignement des roues
-- on ne peut pas assez tourner à haute vitesse
-- Ajouter un ou deux points de visée (lookahead): direction vers un point sur la courbe centrale 10 /25m devant. Comme ça l'agent voit le virage. (a faire avant le système de checkpoints)
-- Track : changements d'altitude, des virages inclinés, un saut/une rampe, et une boucle ou un boost pad si possible. **Contrôle de l'assiette en vol** réglage de l'assiette (tangage) et du roulis en plein vol, à la manière de Trackmania.
-- **Plateformes de boost** et **surfaces modifiant la vitesse** (par exemple, zones à faible adhérence / de terre) en option.
-- **4 roues** avec paramètres configurables : suspension travel, stiffness, damping, friction. Animation des roues : rotation de direction sur les roues avant + rotation de roulement sur toutes les roues en fonction de la vitesse.
-- Faire un menu système solaire, l'utilisateur peut choisir la planète et, pour chaque planète, il y aura un stade d'entrainement pour tester la gravité, les mécaniques de jeu etc. et plusieurs circuits dans cet environnement. La dernière track du jeu sera un parcours multi planètes à la course arc en ciel Mariokart avec une fin dans le soleil ou trou noir. 
-- Ghost car (meilleur temps) : Enregistrement de la position/rotation toutes les 100ms via un `GhostRecorder`, Stockage dans `localStorage` (format JSON compressé), Replay transparent (mesh semi-transparent) pendant la course suivante.
-- Effets particules : Fumée de pneus au freinage/dérapage, Poussière au dépassement des bordures
+- Minimap (top-down orthographic)
+- Changements d'altitude, des virages inclinés, un saut/une rampe, et un looping ou boost pad si possible. **Contrôle de l'assiette en vol** réglage de l'assiette (tangage) et du roulis en plein vol, à la manière de Trackmania.
+- Faire un menu système solaire, l'utilisateur peut choisir la planète et, pour chaque planète, il y aura un stade d'entrainement pour tester la gravité, les mécaniques de jeu etc. et plusieurs circuits dans cet environnement. La dernière track du jeu sera un parcours multi planètes style course arc en ciel Mariokart avec une fin dans le soleil ou trou noir. Surfaces modifiant la vitesse (par exemple, zones à faible adhérence / de terre). @Orlanouille
+- Ghost car (meilleur temps) : Enregistrement de la position/rotation toutes les 100ms via un `GhostRecorder`, Stockage dans `localStorage` (format JSON compressé), Replay semi-transparent pendant la course suivante.
+- Ajouter un ou deux points de visée (lookahead): direction vers un point sur la courbe centrale 10 /25m devant. Comme ça l'agent voit le virage. (a faire avant le système de checkpoints) @Jean808
 - **Système de checkpoints :** A mettre dans src/track/Checkpoint.ts. Volumes de déclenchement invisibles ; doivent être franchis dans l'ordre ; chronométrage intermédiaire (écart en temps réel par rapport au record personnel (vert/rouge)). Permettra le respawn si reset (touche R) ou si voiture retournée.
-- **Prise en charge de la manette** via l'API Gamepad (direction/accélérateur analogiques) — important pour les sensations. Rendre la couche d'entrée abstraite afin que le clavier et la manette fournissent les mêmes valeurs de contrôle.
-- Minimap (facultatif, top-down orthographic render sur render target séparé)
-- frein arrière différentiel pour le handbrake (touche Space)
-- Appui aérodynamique/traînée aérodynamique affectant la maniabilité à grande vitesse.
-- Audio/Musique/Effet sonores
-- Prévoir un cycle jour/nuit 
-- Détection de voiture retournée pendant > 2s
-- Respawn au début du circuit avec vitesse nulle (animation de fondu)
-- Multijoueur
-
-
+- **Prise en charge de la manette** via l'API Gamepad (direction/accélérateur analogiques). Rendre la couche d'entrée abstraite afin que le clavier et la manette fournissent les mêmes valeurs de contrôle.
+- Musique/Effet sonores
+- Cycle jour/nuit 
+- Multijoueur avec contact 

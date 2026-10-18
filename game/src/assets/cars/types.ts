@@ -21,6 +21,8 @@ export interface VehicleConfig {
   color: number;
   /** Échelle dans les aperçus du garage uniquement (1 par défaut). */
   previewScale?: number;
+  /** Correction verticale de la caméra de poursuite (mètres). */
+  chaseCameraHeightOffset?: number;
 
   mass: number; // kg
   /** Demi-dimensions du châssis (collider cuboid) en mètres. */
@@ -61,6 +63,8 @@ export interface VehicleConfig {
   modelOffset?: Vec3;
   /** Couleur uniforme appliquée à tous les meshes du modèle (remplace les matériaux). */
   modelColor?: number;
+  /** Casque noir visuel : position locale au châssis et rayon en mètres. */
+  driverHelmet?: { position: Vec3; radius: number };
   /**
    * Animation visuelle des roues nommées :
    * - `full` : position + braquage + roulement (roues avec origine au centre de leur axe)

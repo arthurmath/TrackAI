@@ -296,6 +296,7 @@ class App {
           this.session.renderRotation,
           this.session.vehicle.forwardSpeed,
           frameDt,
+          this.session.vehicleConfig.chaseCameraHeightOffset,
         );
       }
 

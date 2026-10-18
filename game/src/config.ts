@@ -25,7 +25,7 @@ export const CAMERA_CONFIG = {
   hoodOffset: { x: 0, y: 1.05, z: 0.4 },
   /** FOV de base et FOV max à grande vitesse (sensation de vitesse). */
   baseFov: 70,
-  maxFov: 88,
+  maxFov: 75,
   /** Vitesse (m/s) à laquelle on atteint le FOV max. */
   fovSpeedReference: 60,
 } as const;

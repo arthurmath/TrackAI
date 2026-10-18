@@ -8,6 +8,8 @@ export const car_2: VehicleConfig = {
     id: 'car_2',
     name: 'F1 Maclaren',
     color: 0xff2d55,
+    /** Compense le châssis plus haut pour retrouver la hauteur de suivi de la Trackmania. */
+    chaseCameraHeightOffset: -0.4068,
     mass: 1000,
     chassisHalfExtents: { x: 0.85, y: 0.38, z: 1.95 },
     suspensionRestLength: 0.28,

@@ -611,10 +611,10 @@ export class TrackConstructor {
     const yaw = Math.atan2(t.x, t.z);
 
     // Damier noir/blanc en plan posé sur la route.
-    const cols = 8;
+    const cols = 16;
     const rows = 2;
     const cellW = roadWidth / cols;
-    const cellL = 1.2;
+    const cellL = 0.6;
     const lineGroup = new THREE.Group();
     const white = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 });
     const black = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.6 });

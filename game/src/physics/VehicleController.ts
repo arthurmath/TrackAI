@@ -38,6 +38,8 @@ const WHEEL_GRIP_MULTIPLIER = 1.5;
 const FRONT_GRIP_BIAS = 1.15;
 // Renfort de rigidité latérale appliqué aux quatre roues.
 const LATERAL_GRIP_MULTIPLIER = 1.3;
+// Compense une petite partie des pertes des pneus en virage rapide sous accélération.
+const CORNER_SPEED_RETENTION = 0.2;
 // L'arrière glisse avec peu de résistance pour conserver l'élan en dérapage.
 const DRIFT_REAR_GRIP = 0.05;
 // Le frein amorce la glisse sans dissiper autant de vitesse qu'un freinage droit.
@@ -158,8 +160,8 @@ export class VehicleController {
     const speedFactor = 1 / (1 + speed * 0.0025);
     const targetSteering = -control.steer * cfg.maxSteering * speedFactor;
     // Réactivité du braquage réduite de 15 % à toutes les vitesses, à angle cible identique.
-    // Réduction supplémentaire progressive de 100 à 200 km/h, jusqu'à 40 %.
-    const highSpeedResponse = 1 - 0.4 * THREE.MathUtils.smoothstep(speed * 3.6, 100, 200);
+    // Réduction supplémentaire progressive de 100 à 200 km/h, jusqu'à 50 %.
+    const highSpeedResponse = 1 - 0.5 * THREE.MathUtils.smoothstep(speed * 3.6, 100, 200);
     const steeringResponse = 6 * 0.85 * highSpeedResponse;
     // Retour au centre inchangé.
     const steerLerp = control.steer === 0 ? 8 * dt : steeringResponse * dt;
@@ -210,8 +212,24 @@ export class VehicleController {
       this.vehicle.setWheelSideFrictionStiffness(i, cfg.lateralFriction * lateralGrip);
     }
 
+    const velocityBefore = this.body.linvel();
+    const horizontalSpeedBefore = Math.hypot(velocityBefore.x, velocityBefore.z);
     // filterGroups : les rayons de suspension ignorent les autres voitures.
     this.vehicle.updateVehicle(dt, undefined, CAR_INTERACTION_GROUP);
+
+    if (control.throttle > 0 && control.steer !== 0 && brakeInput === 0
+      && this.forwardSpeed > 0 && this.wheelsInContact() >= 2) {
+      const velocity = this.body.linvel();
+      const horizontalSpeed = Math.hypot(velocity.x, velocity.z);
+      const speedLoss = horizontalSpeedBefore - horizontalSpeed;
+      if (speedLoss > 0 && horizontalSpeed > 0) {
+        // Progressif de 80 à 160 km/h ; conserve la direction et la vitesse verticale.
+        const retention = CORNER_SPEED_RETENTION * control.throttle
+          * THREE.MathUtils.smoothstep(speed * 3.6, 80, 160);
+        const scale = 1 + speedLoss * retention / horizontalSpeed;
+        this.body.setLinvel({ x: velocity.x * scale, y: velocity.y, z: velocity.z * scale }, true);
+      }
+    }
 
     if (this.drifting && this.wheelsInContact() >= 2) {
       const rotation = this.body.rotation();
@@ -255,7 +273,8 @@ export class VehicleController {
       // Le rapport signé conserve le bon sens de braquage en marche arrière.
       if (Math.abs(forward) > 3) {
         trajectorySteering = Math.atan(this.wheelbase * yawRate / forward);
-        trajectoryBlend = THREE.MathUtils.smoothstep(Math.abs(forward), 3, 10);
+        // Conserver 20 % du braquage commandé pour rester lisible à grande vitesse.
+        trajectoryBlend = 0.8 * THREE.MathUtils.smoothstep(Math.abs(forward), 3, 10);
       }
     }
     for (let i = 0; i < this.vehicle.numWheels(); i++) {

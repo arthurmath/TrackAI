@@ -183,7 +183,8 @@ export function getCarPreview(config: VehicleConfig): Promise<string> {
     const loader = new PreviewLoader(resources);
     let environment: THREE.WebGLRenderTarget | undefined;
     try {
-      let view = await new CarConstructor(loader).build(config);
+      // The added driver helmet is reserved for the race, not garage thumbnails.
+      let view = await new CarConstructor(loader).build({ ...config, driverHelmet: undefined });
       if (!loader.hasModel) {
         // Even a missing optional model must retain the game's procedural wheels.
         if (config.wheelAnimation && config.wheelAnimation !== 'full') {

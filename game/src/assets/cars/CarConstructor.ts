@@ -440,6 +440,18 @@ export class CarConstructor {
         });
         const wheelNames = config.wheelMeshNames ?? DEFAULT_WHEEL_NAMES;
         view.replaceWithModel(modelRoot, wheelNames, config.steerWheelMeshNames, config.wheelAxleMeshNames);
+        if (config.driverHelmet) {
+          const { position, radius } = config.driverHelmet;
+          const helmet = new THREE.Mesh(
+            new THREE.SphereGeometry(radius, 24, 16),
+            new THREE.MeshStandardMaterial({ color: 0x080808, roughness: 0.4, metalness: 0.05 }),
+          );
+          helmet.name = 'DriverHelmet';
+          helmet.position.set(position.x, position.y, position.z);
+          helmet.castShadow = true;
+          helmet.receiveShadow = true;
+          view.group.add(helmet);
+        }
       }
     }
 
