@@ -106,10 +106,13 @@ export const track_4: TrackDefinition = {
   /** Modèle 3D du circuit (décor + asphalte visible). */
   modelPath: '/models/tracks/cartoon_circuit/scene.gltf',
   modelScale: CIRCUIT_SCALE,
+  // Collisions sur les murs, traverses et grilles visibles, au-delà du sable.
+  modelBarrierMaterials: ['Muro', 'Travetti', 'Sbarre'],
 
   /**
    * Route procédurale masquée : seul l'asphalte du GLB est visible. Le collider
-   * de route (invisible) suit quand même la ligne centrale ci-dessus.
+   * de route (invisible) suit quand même la ligne centrale ci-dessus. Les
+   * barrières physiques suivent le modèle, sans enfermer la voiture sur l'asphalte.
    * Passe à `true` temporairement si tu veux voir le ruban procédural se
    * superposer à la route du modèle pendant le calage.
    */

@@ -47,6 +47,10 @@ const WHEEL_GRIP_MULTIPLIER = 1.5;
 const FRONT_GRIP_BIAS = 1.15;
 // Renfort de rigidité latérale appliqué aux quatre roues.
 const LATERAL_GRIP_MULTIPLIER = 1.3;
+// Rattrapage du glissement latéral arrière hors drift (s⁻¹).
+const REAR_LATERAL_RESPONSE = 60;
+// Réserve d'adhérence latérale, proportionnelle à la charge de chaque pneu.
+const REAR_LATERAL_GRIP = 1;
 // Compense une petite partie des pertes des pneus en virage rapide sous accélération.
 const CORNER_SPEED_RETENTION = 0.2;
 // L'arrière glisse avec peu de résistance pour conserver l'élan en dérapage.
@@ -75,6 +79,12 @@ export class VehicleController {
   // Buffers réutilisés pour éviter les allocations par frame.
   private readonly _q = new THREE.Quaternion();
   private readonly _v = new THREE.Vector3();
+  private readonly _side = new THREE.Vector3();
+  private readonly _up = new THREE.Vector3();
+  private readonly _gripPoint = new THREE.Vector3();
+  private readonly _lever = new THREE.Vector3();
+  private readonly _angularImpulse = new THREE.Vector3();
+  private readonly _pointVelocity = new THREE.Vector3();
 
   constructor(
     private readonly world: RAPIER.World,
@@ -228,6 +238,8 @@ export class VehicleController {
     // filterGroups : les rayons de suspension ignorent les autres voitures.
     this.vehicle.updateVehicle(dt, undefined, CAR_INTERACTION_GROUP);
 
+    if (!this.drifting) this.stabilizeRearGrip(dt);
+
     if (control.throttle > 0 && control.steer !== 0 && brakeInput === 0
       && this.forwardSpeed > 0 && this.wheelsInContact() >= 2) {
       const velocity = this.body.linvel();
@@ -258,6 +270,49 @@ export class VehicleController {
           z: angularVelocity.z - this._v.z * correction,
         }, true);
       }
+    }
+  }
+
+  /** Freine la dérive au contact arrière, sans imposer de rotation au châssis. */
+  private stabilizeRearGrip(dt: number): void {
+    const rotation = this.body.rotation();
+    this._q.set(rotation.x, rotation.y, rotation.z, rotation.w);
+    this._up.set(0, 1, 0).applyQuaternion(this._q);
+    const center = this.body.worldCom();
+    const inverseInertia = this.body.effectiveWorldInvInertiaSqrt();
+    const response = 1 - Math.exp(-REAR_LATERAL_RESPONSE * dt);
+
+    for (let i = 0; i < this.config.wheelConnections.length; i++) {
+      if (this.config.wheelConnections[i].steering || !this.vehicle.wheelIsInContact(i)) continue;
+      const point = this.vehicle.wheelContactPoint(i)!;
+      const normal = this.vehicle.wheelContactNormal(i)!;
+      // La force reste tangente au sol, y compris sur une pente ou un banking.
+      this._side.set(1, 0, 0).applyQuaternion(this._q);
+      this._v.copy(normal);
+      this._side.addScaledVector(this._v, -this._side.dot(this._v)).normalize();
+      this._lever.copy(point).sub(center);
+      // Appliquer ce renfort à hauteur du centre de masse : ajouter du grip
+      // ne doit pas ajouter un couple de roulis qui soulève les roues intérieures.
+      this._lever.addScaledVector(this._up, -this._lever.dot(this._up));
+      this._gripPoint.copy(center).add(this._lever);
+      this._pointVelocity.crossVectors(this.body.angvel(), this._lever).add(this.body.linvel());
+      const lateralSpeed = this._pointVelocity.dot(this._side);
+
+      // Masse effective au contact : translation et rotation sont couplées.
+      // ||I^(-1/2) (r × n)||² = (r × n)ᵀ I^(-1) (r × n).
+      this._angularImpulse.crossVectors(this._lever, this._side);
+      const { x, y, z } = this._angularImpulse;
+      this._angularImpulse.set(
+        inverseInertia.m11 * x + inverseInertia.m12 * y + inverseInertia.m13 * z,
+        inverseInertia.m21 * x + inverseInertia.m22 * y + inverseInertia.m23 * z,
+        inverseInertia.m31 * x + inverseInertia.m32 * y + inverseInertia.m33 * z,
+      );
+      const inverseMass = this.body.invMass() + this._angularImpulse.lengthSq();
+      const maxImpulse = Math.max(0, this.vehicle.wheelSuspensionForce(i) ?? 0)
+        * REAR_LATERAL_GRIP * dt;
+      if (inverseMass <= 0 || maxImpulse === 0) continue;
+      const impulse = THREE.MathUtils.clamp(-lateralSpeed * response / inverseMass, -maxImpulse, maxImpulse);
+      this.body.applyImpulseAtPoint(this._side.multiplyScalar(impulse), this._gripPoint, true);
     }
   }
 

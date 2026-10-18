@@ -81,6 +81,16 @@ function simulation(config, initialSpeed = 15) {
       // Keep angles above 90° observable instead of folding them backwards.
       return Math.atan2(local.x, local.z) * 180 / Math.PI;
     },
+    rearLateralSpeed() {
+      const body = vehicle.body;
+      const inverse = new THREE.Quaternion().copy(body.rotation()).invert();
+      const linear = new THREE.Vector3().copy(body.linvel()).applyQuaternion(inverse);
+      const angular = new THREE.Vector3().copy(body.angvel()).applyQuaternion(inverse);
+      const center = body.localCom();
+      const rear = config.wheelConnections.filter(wheel => !wheel.steering);
+      return rear.reduce((sum, wheel) => sum + Math.abs(linear.x
+        + angular.y * (wheel.z - center.z) - angular.z * (wheel.y - config.suspensionRestLength - center.y)), 0) / rear.length;
+    },
     dispose() { vehicle.dispose(); world.free(); },
   };
 }
@@ -91,7 +101,7 @@ for (const config of [base.module.car_1, car_2, car_3]) {
       for (const throttle of [0, 1]) {
         const baseline = simulation(config);
         for (let i = 0; i < 30; i++) baseline.step({ ...neutral, steer, throttle });
-        const normalSlip = Math.abs(baseline.slip());
+        const normalRearSlip = baseline.rearLateralSpeed();
         baseline.dispose();
         const outcomes = [];
         for (const brake of ['brake', 'handbrake']) {
@@ -105,7 +115,9 @@ for (const config of [base.module.car_1, car_2, car_3]) {
             const slip = sim.slip();
             const label = `${brake}, throttle=${throttle}, steer=${steer}, slip=${slip.toFixed(1)}°`;
             assert.ok(slip * steer > 12, label);
-            assert.ok(Math.abs(slip) > normalSlip + 8, label);
+            // Le centre du châssis se déplace en biais dans un virage adhérent :
+            // comparer la dérive au niveau de l'essieu, pas l'angle du châssis.
+            assert.ok(sim.rearLateralSpeed() > normalRearSlip + .5, label);
             assert.ok(sim.vehicle.speedKmh > 10, 'Car must still be moving during the slide');
             assert.equal(sim.vehicle.wheelsInContact(), 4, 'Sliding must not rely on lifting the car');
             // Holding the brake must allow growth beyond the old 25° stabilization.
@@ -337,5 +349,55 @@ test('tire smoke requires either brake and stops emitting as soon as it is relea
         sim.dispose();
       }
     }
+  }
+});
+
+for (const config of [car_2, car_3]) {
+  test(`${config.id}: rear axle stays planted in normal turns`, () => {
+    for (const steer of [-1, 1]) {
+      for (const initialSpeed of [2, 5, 15]) {
+        const sim = simulation(config, initialSpeed);
+        try {
+          let totalSlip = 0;
+          for (let i = 0; i < 60; i++) {
+            sim.step({ ...neutral, steer });
+            totalSlip += sim.rearLateralSpeed();
+            assert.equal(sim.vehicle.wheelsInContact(), 4);
+          }
+          const meanSlip = totalSlip / 60;
+          const limit = initialSpeed === 2 ? .025 : initialSpeed === 5 ? .07 : .6;
+          assert.ok(meanSlip < limit, `${initialSpeed} m/s, steer=${steer}: rear slide ${meanSlip} m/s`);
+        } finally {
+          sim.dispose();
+        }
+      }
+    }
+  });
+
+  test(`${config.id}: steering at rest does not rotate the car`, () => {
+    const sim = simulation(config, 0);
+    try {
+      const start = new THREE.Vector3().copy(sim.vehicle.body.translation());
+      for (let i = 0; i < 120; i++) sim.step({ ...neutral, steer: 1 });
+      assert.ok(Math.abs(sim.vehicle.body.angvel().y) < .005);
+      assert.ok(start.distanceTo(sim.vehicle.body.translation()) < .01);
+    } finally {
+      sim.dispose();
+    }
+  });
+}
+
+test('rear grip does not steer or stabilize an airborne car outside drift', () => {
+  const sim = simulation(car_3, 15);
+  try {
+    sim.vehicle.body.setTranslation({ x: 0, y: 30, z: 0 }, true);
+    sim.vehicle.body.setLinvel({ x: 4, y: 0, z: 15 }, true);
+    sim.vehicle.body.setAngvel({ x: 0, y: 3, z: 0 }, true);
+    sim.step({ ...neutral, steer: 1 });
+    assert.equal(sim.vehicle.wheelsInContact(), 0);
+    assert.ok(sim.vehicle.body.angvel().y > 2.9);
+    assert.ok(sim.vehicle.body.linvel().x > 3.9);
+  } finally {
+    sim.dispose();
   }
 });

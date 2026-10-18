@@ -87,6 +87,8 @@ export interface TrackDefinition {
   modelPath?: string;
   /** Facteur d'échelle appliqué au modèle GLB (1 par défaut). */
   modelScale?: number;
+  /** Matériaux des barrières du modèle dont la géométrie remplace les murs procéduraux. */
+  modelBarrierMaterials?: string[];
   /**
    * Affiche la route et les barrières procédurales même quand un GLB est chargé.
    * Utile quand le modèle ne fournit que le décor (stade, paysage…) sans piste.

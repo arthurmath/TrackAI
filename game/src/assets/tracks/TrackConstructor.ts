@@ -178,6 +178,7 @@ export class TrackConstructor {
     // masqués (le GLB remplace le visuel) sauf si showProceduralTrack est activé.
     const useGLB = !!def.modelPath;
     const showTrackVisuals = !useGLB || !!def.showProceduralTrack;
+    const useModelBarriers = useGLB && !!this.assetLoader && !!def.modelBarrierMaterials?.length;
     const midnight = def.scenery === 'midnight-park';
     const park = def.scenery === 'sunset-park' || midnight;
     const raceway = def.roadStyle === 'raceway';
@@ -221,8 +222,10 @@ export class TrackConstructor {
     this.buildRoad(group, trackBody, leftEdge, rightEdge, def, showTrackVisuals);
 
     // --- Barrières ---
-    this.buildBarrier(group, trackBody, leftEdge, def.barrierHeight, 0x3344ff, showTrackVisuals && !raceway);
-    this.buildBarrier(group, trackBody, rightEdge, def.barrierHeight, 0xff3344, showTrackVisuals && !raceway);
+    if (!useModelBarriers) {
+      this.buildBarrier(group, trackBody, leftEdge, def.barrierHeight, 0x3344ff, showTrackVisuals && !raceway);
+      this.buildBarrier(group, trackBody, rightEdge, def.barrierHeight, 0xff3344, showTrackVisuals && !raceway);
+    }
     if (raceway && showTrackVisuals) {
       buildRacewayCircuit(group, samples, leftEdge, rightEdge, curve, def.roadWidth, def.barrierHeight, def.startU ?? 0, signage);
     }
@@ -270,6 +273,9 @@ export class TrackConstructor {
           }
         });
         group.add(modelGroup);
+        if (useModelBarriers) {
+          this.buildModelBarriers(modelGroup, trackBody, def.modelBarrierMaterials!);
+        }
       } else {
         // Fallback : afficher le visuel procédural si le GLB est absent.
         if (!showTrackVisuals) {
@@ -279,6 +285,9 @@ export class TrackConstructor {
           if (raceway) {
             buildRacewayCircuit(group, samples, leftEdge, rightEdge, curve, def.roadWidth, def.barrierHeight, startU, signage);
           }
+        } else if (useModelBarriers) {
+          this.buildBarrier(group, trackBody, leftEdge, def.barrierHeight, 0x3344ff, !raceway);
+          this.buildBarrier(group, trackBody, rightEdge, def.barrierHeight, 0xff3344, !raceway);
         }
         this.buildGround(group, trackBody, def, !park);
         if (park) {
@@ -437,6 +446,39 @@ export class TrackConstructor {
       .setFriction(def.roadFriction)
       .setRestitution(0);
     this.world.createCollider(collider, body);
+  }
+
+  /** Utilise les triangles visibles, transformés dans le repère du corps fixe. */
+  private buildModelBarriers(
+    model: THREE.Object3D,
+    body: RAPIER.RigidBody,
+    materialNames: string[],
+  ): void {
+    const selected = new Set(materialNames);
+    model.updateWorldMatrix(true, true);
+    model.traverse((obj) => {
+      if (!(obj instanceof THREE.Mesh)) return;
+      const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+      if (!materials.some((material) => selected.has(material.name))) return;
+
+      const geometry = obj.geometry.clone();
+      geometry.applyMatrix4(obj.matrixWorld);
+      const positions = geometry.getAttribute('position');
+      const vertices = new Float32Array(positions.count * 3);
+      for (let i = 0; i < positions.count; i++) {
+        vertices[i * 3] = positions.getX(i);
+        vertices[i * 3 + 1] = positions.getY(i);
+        vertices[i * 3 + 2] = positions.getZ(i);
+      }
+      const indices = geometry.index
+        ? new Uint32Array(geometry.index.array)
+        : Uint32Array.from({ length: positions.count }, (_, i) => i);
+      this.world.createCollider(
+        RAPIER.ColliderDesc.trimesh(vertices, indices).setFriction(0.2).setRestitution(0),
+        body,
+      );
+      geometry.dispose();
+    });
   }
 
   private buildBarrier(

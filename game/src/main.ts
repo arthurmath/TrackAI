@@ -295,7 +295,6 @@ class App {
         this.camera.update(
           this.session.renderPosition,
           this.session.renderRotation,
-          this.session.vehicle.forwardSpeed,
           frameDt,
           this.session.vehicleConfig.chaseCameraHeightOffset,
         );

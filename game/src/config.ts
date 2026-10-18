@@ -17,17 +17,14 @@ export const CAMERA_CONFIG = {
   chaseOffset: { x: 0, y: 2.7, z: -6.4 },
   /** Point visé légèrement au-dessus de la voiture. */
   chaseLookAtHeight: 1.2,
-  /** Amortissement du suivi de position (plus petit = plus mou). */
+  /** Réactivité du décalage de caméra lors des changements de cap. */
   positionLerp: 6.0,
   /** Amortissement de la rotation. */
   rotationLerp: 5.0,
   /** Décalage de la hood cam (capot). */
   hoodOffset: { x: 0, y: 1.05, z: 0.4 },
-  /** FOV de base et FOV max à grande vitesse (sensation de vitesse). */
+  /** FOV fixe, indépendant de la vitesse. */
   baseFov: 70,
-  maxFov: 70,
-  /** Vitesse (m/s) à laquelle on atteint le FOV max. */
-  fovSpeedReference: 60,
 } as const;
 
 export const ORBIT_CAMERA_CONFIG = {
