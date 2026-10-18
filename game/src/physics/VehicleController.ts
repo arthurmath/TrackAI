@@ -27,6 +27,15 @@ export interface VehicleSpawn {
   quaternion: THREE.Quaternion;
 }
 
+/** État visuel des pneus, sans effet sur la dynamique. Coordonnées monde. */
+export interface TireSmokeSource {
+  position: THREE.Vector3;
+  normal: THREE.Vector3;
+  velocity: THREE.Vector3;
+  intensity: number;
+  emissionRemainder: number;
+}
+
 // Groupes de collision (InteractionGroups = membership << 16 | filter).
 // Les voitures entrent en collision avec le décor/piste mais PAS entre elles :
 // en entraînement multi-agents, chaque voiture est un « fantôme » indépendant.
@@ -60,6 +69,7 @@ export class VehicleController {
   private readonly wheelbase: number;
   private currentSteering = 0;
   private drifting = false;
+  private brakingIntensity = 0;
   private spawn: VehicleSpawn;
 
   // Buffers réutilisés pour éviter les allocations par frame.
@@ -194,6 +204,7 @@ export class VehicleController {
       }
     }
 
+    this.brakingIntensity = brake > 0 ? brakeInput : 0;
     const enginePerWheel = engine / Math.max(1, this.poweredWheels.length);
     for (let i = 0; i < this.vehicle.numWheels(); i++) {
       this.vehicle.setWheelEngineForce(i, this.poweredWheels.includes(i) ? enginePerWheel : 0);
@@ -296,6 +307,41 @@ export class VehicleController {
     }
   }
 
+  /** Sources de fumée pendant le freinage, amplifiées par le glissement des pneus. */
+  getTireSmokeSources(out: TireSmokeSource[]): void {
+    const rotation = this.body.rotation();
+    this._q.set(rotation.x, rotation.y, rotation.z, rotation.w);
+    const center = this.body.worldCom();
+    const linear = this.body.linvel();
+    const angular = this.body.angvel();
+    for (let i = 0; i < this.vehicle.numWheels(); i++) {
+      const source = out[i] ?? (out[i] = {
+        position: new THREE.Vector3(), normal: new THREE.Vector3(),
+        velocity: new THREE.Vector3(), intensity: 0, emissionRemainder: 0,
+      });
+      source.intensity = 0;
+      if (this.brakingIntensity <= 0 || !this.vehicle.wheelIsInContact(i)) {
+        source.emissionRemainder = 0;
+        continue;
+      }
+      const point = this.vehicle.wheelContactPoint(i)!;
+      const normal = this.vehicle.wheelContactNormal(i)!;
+      source.position.copy(point);
+      source.normal.copy(normal);
+      // Vitesse au pneu : translation + rotation du châssis.
+      source.velocity.set(point.x - center.x, point.y - center.y, point.z - center.z)
+        .crossVectors(angular, source.velocity).add(linear);
+      const steering = this.vehicle.wheelSteering(i) ?? 0;
+      this._v.set(Math.cos(steering), 0, -Math.sin(steering)).applyQuaternion(this._q);
+      const lateralSpeed = Math.abs(source.velocity.dot(this._v));
+      const speed = source.velocity.length();
+      const sliding = THREE.MathUtils.smoothstep(lateralSpeed, 1.5, 7);
+      const braking = this.brakingIntensity * 0.55 * THREE.MathUtils.smoothstep(speed, 3, 14);
+      source.intensity = Math.max(sliding, braking) * THREE.MathUtils.smoothstep(speed, 2, 5);
+      if (source.intensity === 0) source.emissionRemainder = 0;
+    }
+  }
+
   /** Vitesse linéaire monde. */
   getVelocity(out: THREE.Vector3): THREE.Vector3 {
     const v = this.body.linvel();
@@ -335,6 +381,7 @@ export class VehicleController {
     const s = spawn ?? this.spawn;
     this.currentSteering = 0;
     this.drifting = false;
+    this.brakingIntensity = 0;
     this.body.setTranslation({ x: s.position.x, y: s.position.y, z: s.position.z }, true);
     this.body.setRotation({ x: s.quaternion.x, y: s.quaternion.y, z: s.quaternion.z, w: s.quaternion.w }, true);
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);

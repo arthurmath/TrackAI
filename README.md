@@ -146,7 +146,7 @@ Chaque frame, `RaceSession` peut pousser une observation (position, capteurs ray
 
 ### Acceleration
 
-Quand tu maintiens **↑**, le jeu lit la touche comme un accélérateur numérique à pleine puissance : `throttle = 1`. Ce signal est transmis au contrôleur de la voiture, qui applique une force moteur aux roues motrices via le modèle de véhicule à roues simulées par raycast de Rapier.
+Quand tu maintiens ↑, le jeu lit la touche comme un accélérateur numérique à pleine puissance : `throttle = 1`. Ce signal est transmis au contrôleur de la voiture, qui applique une force moteur aux roues motrices via le modèle de véhicule à roues simulées par raycast de Rapier.
 
 La force diminue avec la vitesse. Le code calcule :
 
@@ -170,7 +170,6 @@ En pratique, c’est donc un modèle de conduite simplifié : pas de régime mot
 ## Backlog : 
 
 j'ai l'impression que les roues arrière glissent
-- Minimap (top-down orthographic)
 - Changements d'altitude, des virages inclinés, un saut/une rampe, et un looping ou boost pad si possible. **Contrôle de l'assiette en vol** réglage de l'assiette (tangage) et du roulis en plein vol, à la manière de Trackmania.
 - Faire un menu système solaire, l'utilisateur peut choisir la planète et, pour chaque planète, il y aura un stade d'entrainement pour tester la gravité, les mécaniques de jeu etc. et plusieurs circuits dans cet environnement. La dernière track du jeu sera un parcours multi planètes style course arc en ciel Mariokart avec une fin dans le soleil ou trou noir. Surfaces modifiant la vitesse (par exemple, zones à faible adhérence / de terre). @Orlanouille
 - Ghost car (meilleur temps) : Enregistrement de la position/rotation toutes les 100ms via un `GhostRecorder`, Stockage dans `localStorage` (format JSON compressé), Replay semi-transparent pendant la course suivante.

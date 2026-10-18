@@ -8,7 +8,7 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import { PhysicsWorld } from '../physics/PhysicsWorld';
-import { VehicleController, CAR_INTERACTION_GROUP, type VehicleSpawn, type WheelTransform } from '../physics/VehicleController';
+import { VehicleController, CAR_INTERACTION_GROUP, type VehicleSpawn, type WheelTransform, type TireSmokeSource } from '../physics/VehicleController';
 import { TrackConstructor, type BuiltTrack } from '../assets/tracks/TrackConstructor';
 import { CarConstructor, type VehicleView } from '../assets/cars/CarConstructor';
 import { AssetLoader } from '../utils/AssetLoader';
@@ -17,6 +17,7 @@ import type { VehicleConfig } from '../assets/cars/types';
 import type { TrackDefinition } from '../assets/tracks/types';
 import type { Controller, VehicleObservation } from '../controllers/Controller';
 import type { Lighting } from '../rendering/Lighting';
+import { TireSmoke } from '../rendering/TireSmoke';
 import { AI_CONFIG } from '../config';
 
 const SENSOR_ANGLES = [0, 0.5, -0.5, 1.0, -1.0]; // radians (avant, ±30°, ±60°)
@@ -40,6 +41,7 @@ interface SessionAgent {
   renderPos: THREE.Vector3;
   renderQuat: THREE.Quaternion;
   wheelTransforms: WheelTransform[];
+  tireSmokeSources: TireSmokeSource[];
   flippedTimer: number;
   stuckTimer: number;
   stuckRefX: number;
@@ -56,6 +58,7 @@ export class RaceSession {
 
   private readonly lighting: Lighting;
   private readonly agents: SessionAgent[];
+  private readonly tireSmoke: TireSmoke;
   /** Active le respawn automatique après blocage (mode entraînement). */
   private readonly trainingMode: boolean;
 
@@ -116,6 +119,7 @@ export class RaceSession {
     this.trackDef = trackDef;
     this.lighting = lighting;
     this.trainingMode = trainingMode;
+    this.tireSmoke = new TireSmoke(scene);
 
     const spawn: VehicleSpawn = this.track.spawn;
     this.agents = controllers.map((controller, i) => {
@@ -133,6 +137,7 @@ export class RaceSession {
         renderPos: new THREE.Vector3(),
         renderQuat: new THREE.Quaternion(),
         wheelTransforms: [],
+        tireSmokeSources: [],
         flippedTimer: 0,
         stuckTimer: 0,
         stuckRefX: 0,
@@ -162,6 +167,7 @@ export class RaceSession {
 
   /** Pas fixe de simulation. allowControl=false pendant le compte à rebours. */
   fixedUpdate(dt: number, allowControl: boolean): void {
+    this.tireSmoke.update(dt);
     // 1) Applique les contrôles de chaque agent AVANT le pas physique unique.
     // Chaque agent est isolé dans un try/catch : une exception sur une voiture
     // (état physique NaN, contrôleur défaillant…) ne doit plus figer toute la
@@ -177,6 +183,8 @@ export class RaceSession {
 
         if (allowControl) {
           agent.vehicle.update(control, dt);
+          agent.vehicle.getTireSmokeSources(agent.tireSmokeSources);
+          this.tireSmoke.emit(agent.tireSmokeSources, dt);
         } else {
           agent.vehicle.update({ throttle: 0, brake: 0, steer: 0, handbrake: true, reset: false }, dt);
         }
@@ -259,6 +267,7 @@ export class RaceSession {
       agent.view.update(agent.renderPos, agent.renderQuat, agent.wheelTransforms);
     }
     this.lighting.followTarget(this.primary.renderPos);
+    this.tireSmoke.render();
   }
 
   /** Véhicule principal (compat : caméra, debug). */
@@ -387,6 +396,10 @@ export class RaceSession {
 
   private respawnAgent(agent: SessionAgent): void {
     agent.vehicle.respawn();
+    for (const source of agent.tireSmokeSources) {
+      source.intensity = 0;
+      source.emissionRemainder = 0;
+    }
     agent.flippedTimer = 0;
     agent.stuckTimer = 0;
     agent.vehicle.getChassisTransform(agent.currPos, agent.currQuat);
@@ -424,6 +437,7 @@ export class RaceSession {
   }
 
   dispose(scene: THREE.Scene): void {
+    this.tireSmoke.dispose();
     for (const agent of this.agents) {
       scene.remove(agent.view.group);
       agent.view.dispose();

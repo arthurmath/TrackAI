@@ -212,6 +212,7 @@ class App {
 
     this.resultsShown = false;
     this.menus.hide();
+    this.hud.setMinimapTrack(this.aiMode === 'training' ? null : trackDef);
     this.hud.show();
     if (this.aiMode === 'training') {
       this.hud.showTrainingControls(() => this.stopTraining());
@@ -308,6 +309,7 @@ class App {
       }
       if (this.state === 'racing' || this.state === 'paused') {
         this.hud.update(snap, this.session.speedKmh);
+        this.hud.updateMinimap(this.session.renderPosition, this.session.renderRotation);
       }
       this.post.setSpeed(trainingView ? 0 : this.session.speed01);
     }
@@ -338,6 +340,7 @@ class App {
   }
 
   private disposeSession(): void {
+    this.hud.setMinimapTrack(null);
     this.orbitCamera.deactivate();
     this.trainingDash.stop();
     if (this.session) {

@@ -305,3 +305,37 @@ test('space at rest holds the car without engaging reverse', () => {
     sim.dispose();
   }
 });
+
+test('tire smoke requires either brake and stops emitting as soon as it is released', () => {
+  for (const config of [base.module.car_1, car_2, car_3]) {
+    for (const brake of ['brake', 'handbrake']) {
+      const sim = simulation(config, 25);
+      const sources = [];
+      const braking = { ...neutral, throttle: 1, steer: 1,
+        brake: brake === 'brake' ? 1 : 0, handbrake: brake === 'handbrake' };
+      try {
+        for (let i = 0; i < 15; i++) {
+          sim.step({ ...neutral, throttle: 1, steer: 1 });
+          sim.vehicle.getTireSmokeSources(sources);
+          assert.ok(sources.every(source => source.intensity === 0), 'Turning alone must not emit smoke');
+        }
+        for (let i = 0; i < 15; i++) sim.step(braking);
+        sim.vehicle.getTireSmokeSources(sources);
+        assert.ok(sources.some(source => source.intensity > 0), `${config.id}: ${brake} should emit smoke`);
+        // Une glisse résiduelle ne doit pas prolonger l'émission après relâchement.
+        assert.ok(Math.abs(sim.slip()) > 3);
+        sources.forEach(source => { source.emissionRemainder = 0.9; });
+        sim.step({ ...neutral, throttle: 1, steer: 1 });
+        sim.vehicle.getTireSmokeSources(sources);
+        assert.ok(sources.every(source => source.intensity === 0 && source.emissionRemainder === 0));
+
+        sim.vehicle.body.setTranslation({ x: 0, y: 30, z: 0 }, true);
+        sim.step(braking);
+        sim.vehicle.getTireSmokeSources(sources);
+        assert.ok(sources.every(source => source.intensity === 0), 'Airborne braking must not emit smoke');
+      } finally {
+        sim.dispose();
+      }
+    }
+  }
+});

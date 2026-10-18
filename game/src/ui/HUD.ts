@@ -4,6 +4,9 @@
  */
 import type { RaceSnapshot } from '../utils/Recorder';
 import { formatTime, formatDelta } from '../utils/helpers';
+import type { Quaternion, Vector3 } from 'three';
+import type { TrackDefinition } from '../assets/tracks/types';
+import { Minimap } from './Minimap';
 
 const SPEEDO_MAX_KMH = 320;
 const ARC_RADIUS = 80;
@@ -27,6 +30,7 @@ export class HUD {
   private readonly arcFg: SVGPathElement;
   private readonly arcLength: number;
   private trainingBar: HTMLElement | null = null;
+  private minimap: Minimap | null = null;
 
   constructor(parent: HTMLElement) {
     this.root = document.createElement('div');
@@ -86,6 +90,15 @@ export class HUD {
   show(): void {
     this.root.classList.remove('hidden');
   }
+
+  setMinimapTrack(track: TrackDefinition | null): void {
+    this.minimap?.dispose();
+    this.minimap = track ? new Minimap(this.root, track) : null;
+  }
+
+  updateMinimap(position: Vector3, rotation: Quaternion): void {
+    this.minimap?.update(position, rotation);
+  }
   hide(): void {
     this.root.classList.add('hidden');
     this.hideTrainingControls();
@@ -128,6 +141,7 @@ export class HUD {
   }
 
   dispose(): void {
+    this.minimap?.dispose();
     this.root.remove();
   }
 }

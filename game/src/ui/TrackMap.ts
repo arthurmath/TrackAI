@@ -29,8 +29,8 @@ export function trackLengthMeters(track: TrackDefinition): number {
   return trackCurve(track).getLength();
 }
 
-/** A proportionally fitted plan of the actual centerline, with its real start. */
-export function trackMapSvg(track: TrackDefinition, className = 'track-map'): string {
+/** Shared world-to-map projection for both circuit previews and the live HUD. */
+export function createTrackMapLayout(track: TrackDefinition) {
   const curve = trackCurve(track);
   const samples = curve.getSpacedPoints(Math.max(256, track.segments));
   let minX = Infinity;
@@ -51,10 +51,16 @@ export function trackMapSvg(track: TrackDefinition, className = 'track-map'): st
   );
   const centerX = (minX + maxX) / 2;
   const centerZ = (minZ + maxZ) / 2;
-  const project = (point: Vector3): [number, number] => [
+  const project = (point: { x: number; z: number }): [number, number] => [
     MAP_WIDTH / 2 + (point.x - centerX) * scale,
     MAP_HEIGHT / 2 + (point.z - centerZ) * scale,
   ];
+  return { curve, samples, scale, project };
+}
+
+/** A proportionally fitted plan of the actual centerline, with its real start. */
+export function trackMapSvg(track: TrackDefinition, className = 'track-map'): string {
+  const { curve, samples, scale, project } = createTrackMapLayout(track);
   const coordinates = (point: Vector3): string => project(point)
     .map((coordinate) => coordinate.toFixed(2))
     .join(' ');
