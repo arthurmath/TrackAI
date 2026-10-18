@@ -8,8 +8,7 @@ from torch.distributions import Normal
 from utils import device, format
 
 
-ACTION_STD_MIN = 0.25
-LOG_ACTION_STD_MIN = math.log(ACTION_STD_MIN)
+LOG_ACTION_STD_MIN = math.log(0.25)
 
 
 class ActorCritic(nn.Module):
@@ -22,7 +21,6 @@ class ActorCritic(nn.Module):
 
     def __init__(self, state_dim, action_dim, layers, action_std_init=0.6):
         super().__init__()
-        self.action_dim = action_dim
 
         actor_layers = []
         last_dim = state_dim

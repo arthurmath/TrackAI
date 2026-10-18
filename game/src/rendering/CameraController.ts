@@ -55,7 +55,7 @@ export class CameraController {
       this.smoothedLook.copy(this.lookTarget);
       this.camera.lookAt(this.smoothedLook);
     } else {
-      const o = mode === 'far' ? { x: 0, y: 6.5, z: -13 } : CAMERA_CONFIG.chaseOffset;
+      const o = mode === 'far' ? { x: 0, y: 5.5, z: -11 } : CAMERA_CONFIG.chaseOffset;
       this._offset.set(o.x, o.y, o.z).applyQuaternion(carQuat);
       this.desiredPos.copy(carPos).add(this._offset);
       this.lookTarget.copy(carPos);

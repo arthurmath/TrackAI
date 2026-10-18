@@ -15,6 +15,8 @@ export interface WheelTransform {
   position: THREE.Vector3;
   /** Rotation de braquage (autour de Y, espace local châssis). */
   steering: number;
+  /** Angle de rendu corrigé selon la trajectoire, sans modifier le braquage physique. */
+  visualSteering?: number;
   /** Rotation de roulement (autour de l'axe X de la roue). */
   roll: number;
   radius: number;
@@ -30,8 +32,16 @@ export interface VehicleSpawn {
 // en entraînement multi-agents, chaque voiture est un « fantôme » indépendant.
 const GROUP_TRACK = 0x0001;
 const GROUP_CAR = 0x0002;
-// Adhérence arrière conservée pendant un dérapage, commune aux deux freins.
-const DRIFT_REAR_GRIP = 0.35;
+// Relève la limite d'effort des pneus pour conserver du grip en virage rapide.
+const WHEEL_GRIP_MULTIPLIER = 1.5;
+// L'avant dispose d'une réserve supplémentaire pour réduire le sous-virage.
+const FRONT_GRIP_BIAS = 1.15;
+// Renfort de rigidité latérale appliqué aux quatre roues.
+const LATERAL_GRIP_MULTIPLIER = 1.3;
+// L'arrière glisse avec peu de résistance pour conserver l'élan en dérapage.
+const DRIFT_REAR_GRIP = 0.05;
+// Le frein amorce la glisse sans dissiper autant de vitesse qu'un freinage droit.
+const DRIFT_BRAKE_MULTIPLIER = 0.2;
 // Limite de vitesse de rotation (rad/s), abaissée à mesure que la voiture accélère.
 // Elle ne dépend pas de l'angle : maintenir le frein permet toujours de tourner davantage.
 const DRIFT_MAX_YAW_RATE = 2.4;
@@ -45,7 +55,7 @@ export class VehicleController {
   private readonly collider: RAPIER.Collider;
   private readonly poweredWheels: number[] = [];
   private readonly steeredWheels: number[] = [];
-  private readonly rearWheels: number[] = [];
+  private readonly wheelbase: number;
   private currentSteering = 0;
   private drifting = false;
   private spawn: VehicleSpawn;
@@ -60,6 +70,8 @@ export class VehicleController {
     spawn: VehicleSpawn,
   ) {
     this.spawn = { position: spawn.position.clone(), quaternion: spawn.quaternion.clone() };
+    const wheelZ = config.wheelConnections.map(wheel => wheel.z);
+    this.wheelbase = Math.max(...wheelZ) - Math.min(...wheelZ);
 
     const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
       .setTranslation(spawn.position.x, spawn.position.y, spawn.position.z)
@@ -116,11 +128,11 @@ export class VehicleController {
       this.vehicle.setWheelMaxSuspensionTravel(i, config.maxSuspensionTravel);
       this.vehicle.setWheelSuspensionCompression(i, config.suspensionDamping * 0.85);
       this.vehicle.setWheelSuspensionRelaxation(i, config.suspensionDamping);
-      this.vehicle.setWheelFrictionSlip(i, config.wheelFriction);
-      this.vehicle.setWheelSideFrictionStiffness(i, config.lateralFriction);
+      const gripBias = w.z > 0 ? FRONT_GRIP_BIAS : 1;
+      this.vehicle.setWheelFrictionSlip(i, config.wheelFriction * WHEEL_GRIP_MULTIPLIER * gripBias);
+      this.vehicle.setWheelSideFrictionStiffness(i, config.lateralFriction * LATERAL_GRIP_MULTIPLIER * gripBias);
       if (w.powered) this.poweredWheels.push(i);
       if (w.steering) this.steeredWheels.push(i);
-      if (w.z < 0) this.rearWheels.push(i);
     });
   }
 
@@ -142,10 +154,15 @@ export class VehicleController {
     const speed = Math.abs(this.forwardSpeed);
 
     // --- Braquage progressif avec réduction à haute vitesse ---
-    const speedFactor = 1 / (1 + speed * 0.01);
+    // Réduction moins forte à haute vitesse pour conserver davantage de braquage.
+    const speedFactor = 1 / (1 + speed * 0.0025);
     const targetSteering = -control.steer * cfg.maxSteering * speedFactor;
-    // Retour au centre / approche progressive (lerpAngle).
-    const steerLerp = control.steer === 0 ? 8 * dt : 6 * dt;
+    // Réactivité du braquage réduite de 15 % à toutes les vitesses, à angle cible identique.
+    // Réduction supplémentaire progressive de 100 à 200 km/h, jusqu'à 40 %.
+    const highSpeedResponse = 1 - 0.4 * THREE.MathUtils.smoothstep(speed * 3.6, 100, 200);
+    const steeringResponse = 6 * 0.85 * highSpeedResponse;
+    // Retour au centre inchangé.
+    const steerLerp = control.steer === 0 ? 8 * dt : steeringResponse * dt;
     this.currentSteering += (targetSteering - this.currentSteering) * Math.min(1, steerLerp);
     for (const i of this.steeredWheels) {
       this.vehicle.setWheelSteering(i, this.currentSteering);
@@ -157,7 +174,7 @@ export class VehicleController {
     const overMax = speed >= cfg.maxSpeed;
     if (control.throttle > 0) {
       // Courbe douce : couple plus faible à haute vitesse.
-      const powerCurve = 1 - Math.min(1, speed / cfg.maxSpeed) * 0.6;
+      const powerCurve = 1 - 0.6 * Math.min(1, speed / cfg.maxSpeed);
       engine = overMax ? 0 : control.throttle * cfg.engineForce * powerCurve;
     }
     const brakeInput = Math.max(control.brake, Number(control.handbrake));
@@ -168,7 +185,7 @@ export class VehicleController {
     if (brakeInput > 0) {
       if (this.forwardSpeed > 0.5 || control.throttle > 0 || control.handbrake) {
         // Les deux touches freinent pareil ; seul Bas peut engager la marche arrière.
-        brake = brakeInput * cfg.brakeForce;
+        brake = brakeInput * cfg.brakeForce * (this.drifting ? DRIFT_BRAKE_MULTIPLIER : 1);
       } else {
         // À l'arrêt / en arrière : marche arrière.
         engine = -control.brake * cfg.engineForce * 0.5;
@@ -181,11 +198,16 @@ export class VehicleController {
       this.vehicle.setWheelBrake(i, brake);
     }
 
-    // --- Dérapage : frein + direction, indépendamment de l'accélérateur ---
-    const rearGrip = this.drifting ? DRIFT_REAR_GRIP : 1;
-    for (const i of this.rearWheels) {
-      // Aucun retour de grip en fonction de l'angle tant que le frein reste appuyé.
-      this.vehicle.setWheelFrictionSlip(i, cfg.wheelFriction * rearGrip);
+    // Le frein en virage libère l'arrière ; son relâchement rétablit le grip normal.
+    for (let i = 0; i < this.vehicle.numWheels(); i++) {
+      const wheel = cfg.wheelConnections[i];
+      const gripBias = wheel.z > 0 ? FRONT_GRIP_BIAS : 1;
+      const grip = this.drifting
+        ? (wheel.z < 0 ? DRIFT_REAR_GRIP : 1)
+        : WHEEL_GRIP_MULTIPLIER * gripBias;
+      const lateralGrip = this.drifting ? 1 : LATERAL_GRIP_MULTIPLIER * gripBias;
+      this.vehicle.setWheelFrictionSlip(i, cfg.wheelFriction * grip);
+      this.vehicle.setWheelSideFrictionStiffness(i, cfg.lateralFriction * lateralGrip);
     }
 
     // filterGroups : les rayons de suspension ignorent les autres voitures.
@@ -220,6 +242,22 @@ export class VehicleController {
 
   /** Calcule la transform locale (par rapport au châssis) de chaque roue. */
   getWheelTransforms(out: WheelTransform[]): void {
+    let trajectorySteering = 0;
+    let trajectoryBlend = 0;
+    if (this.config.alignVisualSteeringToTrajectory && !this.drifting && this.wheelsInContact() >= 2) {
+      const rotation = this.body.rotation();
+      this._q.set(rotation.x, rotation.y, rotation.z, rotation.w).invert();
+      const velocity = this.body.linvel();
+      const forward = this._v.set(velocity.x, velocity.y, velocity.z).applyQuaternion(this._q).z;
+      const angularVelocity = this.body.angvel();
+      const yawRate = this._v.set(angularVelocity.x, angularVelocity.y, angularVelocity.z).applyQuaternion(this._q).y;
+      // Modèle bicyclette : tan(angle) = empattement / rayon, rayon = vitesse / lacet.
+      // Le rapport signé conserve le bon sens de braquage en marche arrière.
+      if (Math.abs(forward) > 3) {
+        trajectorySteering = Math.atan(this.wheelbase * yawRate / forward);
+        trajectoryBlend = THREE.MathUtils.smoothstep(Math.abs(forward), 3, 10);
+      }
+    }
     for (let i = 0; i < this.vehicle.numWheels(); i++) {
       const conn = this.vehicle.wheelChassisConnectionPointCs(i)!;
       const susp = this.vehicle.wheelSuspensionLength(i) ?? this.config.suspensionRestLength;
@@ -227,6 +265,13 @@ export class VehicleController {
       // La roue descend de (suspensionLength) le long de l'axe -Y local.
       wt.position.set(conn.x, conn.y - susp, conn.z);
       wt.steering = this.vehicle.wheelSteering(i) ?? 0;
+      if (this.config.alignVisualSteeringToTrajectory) {
+        const commanded = wt.steering * (this.config.visualSteerScale ?? 1);
+        // Réduire seulement : un transfert de charge ou un contre-braquage ne doit
+        // jamais inverser les roues ni les faire braquer au-delà de la commande.
+        const aligned = THREE.MathUtils.clamp(trajectorySteering, Math.min(0, commanded), Math.max(0, commanded));
+        wt.visualSteering = THREE.MathUtils.lerp(commanded, aligned, trajectoryBlend);
+      }
       wt.roll = this.vehicle.wheelRotation(i) ?? 0;
       wt.radius = this.config.wheelRadius;
     }

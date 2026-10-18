@@ -169,9 +169,12 @@ En pratique, c’est donc un modèle de conduite simplifié : pas de régime mot
 
 ## Backlog : 
 
+quand je vais vite et que je tourne, j'ai l'impression que ça réduit ma vitesse. 
+réduire le dezoom quand on va vite
+j'ai l'impression que les roues arrière glissent
+mettre un eboule noire dans le cockpit de la voiture trackmania
 - problème d'alignement des roues
 - on ne peut pas assez tourner à haute vitesse
-- Ajouter les 3 caméras, toggle avec "c"
 - Ajouter un ou deux points de visée (lookahead): direction vers un point sur la courbe centrale 10 /25m devant. Comme ça l'agent voit le virage. (a faire avant le système de checkpoints)
 - Track : changements d'altitude, des virages inclinés, un saut/une rampe, et une boucle ou un boost pad si possible. **Contrôle de l'assiette en vol** réglage de l'assiette (tangage) et du roulis en plein vol, à la manière de Trackmania.
 - **Plateformes de boost** et **surfaces modifiant la vitesse** (par exemple, zones à faible adhérence / de terre) en option.

@@ -14,7 +14,7 @@ export const PHYSICS_CONFIG = {
 
 export const CAMERA_CONFIG = {
   /** Décalage de la chase cam derrière/au-dessus de la voiture (espace local voiture). */
-  chaseOffset: { x: 0, y: 3.2, z: -7.5 },
+  chaseOffset: { x: 0, y: 2.7, z: -6.4 },
   /** Point visé légèrement au-dessus de la voiture. */
   chaseLookAtHeight: 1.2,
   /** Amortissement du suivi de position (plus petit = plus mou). */

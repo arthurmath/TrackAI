@@ -209,3 +209,58 @@ test('rolling follows actual Rapier axle angles while driving and reversing', as
   assert.ok(reverse.every(r => r < -1));
   vehicle.dispose(); world.free();
 });
+
+test('F1 and Trackmania front wheels follow turn curvature as speed increases', async () => {
+  const rapierUrl = import.meta.resolve('@dimforge/rapier3d-compat');
+  const RAPIER = (await import(rapierUrl)).default;
+  await RAPIER.init();
+  const { module: { VehicleController } } = await sourceModule('../src/physics/VehicleController.ts', { '@dimforge/rapier3d-compat': rapierUrl });
+  for (const config of [car_2, car_3]) {
+    const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+    world.timestep = 1 / 60;
+    world.createCollider(RAPIER.ColliderDesc.cuboid(100, .1, 100).setTranslation(0, -.1, 0).setCollisionGroups(0x00010002));
+    const vehicle = new VehicleController(world, config, { position: new THREE.Vector3(0, 2, 0), quaternion: identity });
+    const view = await build(config, `../public${config.modelPath}`);
+    const neutral = { throttle: 0, brake: 0, steer: 0, handbrake: false, reset: false };
+    const wheels = [];
+    try {
+      for (let i = 0; i < 240; i++) { vehicle.update(neutral, world.timestep); world.step(); }
+      assert.equal(vehicle.wheelsInContact(), 4);
+      const wheelbase = Math.max(...config.wheelConnections.map(w => w.z)) - Math.min(...config.wheelConnections.map(w => w.z));
+      const frontNames = config === car_2 ? ['Object_13_R_Steering', 'Object_13_L_Steering'] : ['Wheel_FL_Steering', 'Wheel_FR_Steering'];
+      // Hold physical steering fixed: the same yaw rate at higher speed means
+      // a wider turning radius, so the rendered wheels should straighten.
+      for (const steer of [-.5, .5]) {
+        for (const travel of [-1, 1]) {
+          const yaw = Math.sign(steer) * .5;
+          const angles = [];
+          for (const speed of [0, 10, 30, 60]) {
+            const orientation = new THREE.Quaternion().setFromEuler(new THREE.Euler(.2, .7, -.1));
+            vehicle.body.setRotation(orientation, true);
+            vehicle.body.setLinvel(new THREE.Vector3(0, 0, speed * travel).applyQuaternion(orientation), true);
+            vehicle.body.setAngvel(new THREE.Vector3(0, yaw * travel, 0).applyQuaternion(orientation), true);
+            for (let i = 0; i < 4; i++) vehicle.vehicle.setWheelSteering(i, i < 2 ? steer : 0);
+            vehicle.getWheelTransforms(wheels);
+            view.update(origin, identity, wheels);
+            const expected = speed === 0 ? steer * (config.visualSteerScale ?? 1) : Math.atan(wheelbase * yaw / speed);
+            frontNames.forEach((name, i) => {
+              assert.ok(Math.abs(view.group.getObjectByName(name).rotation.y - expected) < 1e-6, `${config.id}, ${name}, ${speed} m/s`);
+              assert.equal(wheels[i].steering, steer, 'Rendering must preserve physical steering');
+            });
+            assert.equal(wheels[2].visualSteering, 0);
+            assert.equal(wheels[3].visualSteering, 0);
+            angles.push(Math.abs(wheels[0].visualSteering));
+          }
+          assert.ok(angles[3] < angles[2] && angles[2] < angles[1] && angles[1] < angles[0]);
+          assert.ok(angles[3] < angles[0] * .1, 'Fast turns visibly reduce front wheel angle');
+          vehicle.drifting = true;
+          vehicle.getWheelTransforms(wheels);
+          assert.equal(wheels[0].visualSteering, steer * (config.visualSteerScale ?? 1));
+          vehicle.drifting = false;
+        }
+      }
+    } finally {
+      vehicle.dispose(); world.free(); view.dispose();
+    }
+  }
+});

@@ -25,5 +25,6 @@ export const car_3: VehicleConfig = {
   // Center the body on Z and align the wheel centers with the resting suspension.
   modelOffset: { x: -0.00044, y: -0.582, z: -0.27044 },
   wheelAnimation: 'full',
+  alignVisualSteeringToTrajectory: true,
   wheelMeshNames: ['Wheel_FL', 'Wheel_FR', 'Wheel_RL', 'Wheel_RR'],
 };

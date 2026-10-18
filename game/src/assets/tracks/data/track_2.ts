@@ -60,4 +60,5 @@ export const track_2: TrackDefinition = {
   },
   decorations: [],
   startU: 0,
+  spawnOffset: 5,
 };

@@ -128,6 +128,31 @@ for (const config of [base.module.car_1, car_2, car_3]) {
   });
 }
 
+test('a sustained drift retains momentum without throttle', () => {
+  const initialSpeed = 25;
+  for (const config of [base.module.car_1, car_2, car_3]) {
+    for (const steer of [-1, 1]) {
+      for (const brake of ['brake', 'handbrake']) {
+        const sim = simulation(config, initialSpeed);
+        try {
+          for (let i = 0; i < 60; i++) {
+            sim.step({ ...neutral, steer,
+              brake: brake === 'brake' ? 1 : 0, handbrake: brake === 'handbrake' });
+          }
+          const velocity = sim.vehicle.body.linvel();
+          const horizontalSpeed = Math.hypot(velocity.x, velocity.z);
+          const label = `${config.id}, ${brake}, steer=${steer}`;
+          assert.ok(horizontalSpeed > initialSpeed * .55, `${label}: retain over 55% of speed after one second`);
+          assert.ok(sim.slip() * steer > 35, `${label}: momentum must be retained during a visible slide`);
+          assert.equal(sim.vehicle.wheelsInContact(), 4);
+        } finally {
+          sim.dispose();
+        }
+      }
+    }
+  }
+});
+
 test('drift rotation is slower at high speed without capping the angle', () => {
   for (const steer of [-1, 1]) {
     for (const throttle of [0, 1]) {

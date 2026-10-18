@@ -85,4 +85,6 @@ export interface VehicleConfig {
    * Utile quand le mesh exagère l'angle réel.
    */
   visualSteerScale?: number;
+  /** À vitesse élevée, limite le braquage visuel selon la courbure réelle du virage. */
+  alignVisualSteeringToTrajectory?: boolean;
 }

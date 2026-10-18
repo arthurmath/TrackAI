@@ -95,4 +95,6 @@ export interface TrackDefinition {
 
   /** Position de départ le long de la courbe [0..1]. */
   startU?: number;
+  /** Décalage du spawn en mètres avant la ligne de départ, dans le sens inverse de la course. */
+  spawnOffset?: number;
 }

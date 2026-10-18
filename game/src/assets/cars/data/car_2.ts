@@ -42,4 +42,5 @@ export const car_2: VehicleConfig = {
     wheelAxleMeshNames: ['Object_13', 'Object_12'],
     /** Le mesh GLB braque visuellement plus fort que la physique. */
     visualSteerScale: 0.65,
+    alignVisualSteeringToTrajectory: true,
 };

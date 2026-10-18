@@ -50,4 +50,5 @@ export const track_1: TrackDefinition = {
   // The sunset-park theme builds the complete landscape around the sampled road.
   decorations: [],
   startU: 0,
+  spawnOffset: 5,
 };

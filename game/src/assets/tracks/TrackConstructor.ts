@@ -247,6 +247,7 @@ export class TrackConstructor {
     // --- Spawn ---
     const sp = curve.getPointAt(startU);
     const st = curve.getTangentAt(startU).normalize();
+    sp.addScaledVector(st, -(def.spawnOffset ?? 0));
     const yaw = Math.atan2(st.x, st.z);
     const spawnQuat = new THREE.Quaternion().setFromAxisAngle(UP, yaw);
     const spawn: VehicleSpawn = {

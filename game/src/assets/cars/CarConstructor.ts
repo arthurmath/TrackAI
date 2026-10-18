@@ -348,16 +348,17 @@ export class VehicleView {
       const physIdx = this.wheelPhysicsIndices[i] ?? i;
       if (physIdx >= wheels.length) continue;
       const w = wheels[physIdx];
+      const steering = w.visualSteering ?? w.steering * this.visualSteerScale;
       if (this.wheelAnimation === 'full') {
         pivot.position.copy(w.position);
         if (this.modelWheelOffsets[i]) pivot.position.add(this.modelWheelOffsets[i]);
-        pivot.rotation.set(0, w.steering * this.visualSteerScale, 0);
+        pivot.rotation.set(0, steering, 0);
         const wheelMesh = pivot.children[0];
         if (wheelMesh) wheelMesh.rotation.x = w.roll;
       } else if (this.wheelAnimation === 'steer-only') {
         const baseQ = this.wheelBaseQuaternions[i];
         const axis = this.steerAxes[i] ?? WORLD_UP;
-        const steerQ = new THREE.Quaternion().setFromAxisAngle(axis, w.steering * this.visualSteerScale);
+        const steerQ = new THREE.Quaternion().setFromAxisAngle(axis, steering);
         pivot.quaternion.copy(baseQ).multiply(steerQ);
       }
     }
