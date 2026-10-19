@@ -192,7 +192,55 @@ test('drift rotation is slower at high speed without capping the angle', () => {
             sim.dispose();
           }
         }
-        assert.ok(peaks[1] < peaks[0] * .8, 'Rotation should slow further at higher speed');
+        assert.ok(peaks[1] < peaks[0], 'Rotation should still slow at higher speed');
+      }
+    }
+  }
+});
+
+test('high-speed drift responds promptly and keeps rotating with all cars and either brake', () => {
+  for (const config of [base.module.car_1, car_2, car_3]) {
+    for (const [initialSpeed, minHalfSecondHeading, minHeading] of [[40, 27, 60], [60, 23, 52]]) {
+      for (const steer of [-1, 1]) {
+        for (const throttle of [0, 1]) {
+          for (const brake of ['brake', 'handbrake']) {
+            const sim = simulation(config, initialSpeed);
+            const label = `${config.id}, ${initialSpeed * 3.6} km/h, steer=${steer}, throttle=${throttle}, ${brake}`;
+            try {
+              let heading = 0;
+              for (let i = 0; i < 60; i++) {
+                sim.step({ ...neutral, steer, throttle,
+                  brake: brake === 'brake' ? 1 : 0, handbrake: brake === 'handbrake' });
+                const up = new THREE.Vector3(0, 1, 0)
+                  .applyQuaternion(new THREE.Quaternion().copy(sim.vehicle.body.rotation()));
+                // Integrate chassis rotation so tire slip alone cannot satisfy the test.
+                heading -= steer * up.dot(sim.vehicle.body.angvel()) / 60 * 180 / Math.PI;
+                if (i === 29) assert.ok(heading > minHalfSecondHeading, `${label}: response=${heading}°`);
+                assert.equal(sim.vehicle.wheelsInContact(), 4, label);
+              }
+              assert.ok(heading > minHeading && heading < 80, `${label}: heading=${heading}°`);
+              const velocity = sim.vehicle.body.linvel();
+              assert.ok(Math.hypot(velocity.x, velocity.z) > initialSpeed * .65, `${label}: retain momentum`);
+            } finally {
+              sim.dispose();
+            }
+          }
+        }
+      }
+    }
+  }
+});
+
+test('steering while reversing keeps driving backwards without engaging drift', () => {
+  for (const config of [base.module.car_1, car_2, car_3]) {
+    for (const steer of [-1, 1]) {
+      const sim = simulation(config, -5);
+      try {
+        for (let i = 0; i < 30; i++) sim.step({ ...neutral, brake: 1, steer });
+        assert.ok(sim.vehicle.forwardSpeed < -5, `${config.id}, steer=${steer}: reverse must keep accelerating`);
+        assert.equal(sim.vehicle.wheelsInContact(), 4);
+      } finally {
+        sim.dispose();
       }
     }
   }

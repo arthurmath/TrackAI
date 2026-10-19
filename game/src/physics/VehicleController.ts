@@ -61,6 +61,9 @@ const DRIFT_BRAKE_MULTIPLIER = 0.2;
 // Elle ne dépend pas de l'angle : maintenir le frein permet toujours de tourner davantage.
 const DRIFT_MAX_YAW_RATE = 2.4;
 const DRIFT_YAW_SPEED_SCALE = 25; // m/s
+// Au-delà de 72 km/h, atténuer moins vite la rotation pour garder du contrôle en drift.
+const DRIFT_YAW_HIGH_SPEED_THRESHOLD = 20; // m/s
+const DRIFT_YAW_HIGH_SPEED_SCALE = 60; // m/s
 /** Groupes des colliders voiture ET des rayons (suspension, capteurs). */
 export const CAR_INTERACTION_GROUP = (GROUP_CAR << 16) | GROUP_TRACK;
 
@@ -174,15 +177,24 @@ export class VehicleController {
   update(control: ControlState, dt: number): void {
     const cfg = this.config;
     const speed = Math.abs(this.forwardSpeed);
+    const brakeInput = Math.max(control.brake, Number(control.handbrake));
+    // Le virage amorce la glisse en marche avant ; en marche arrière, Bas
+    // doit rester une commande moteur même si le joueur tourne.
+    this.drifting = brakeInput > 0 && this.forwardSpeed > 0.5
+      && (this.drifting || control.steer !== 0);
 
     // --- Braquage progressif avec réduction à haute vitesse ---
     // Réduction moins forte à haute vitesse pour conserver davantage de braquage.
     const speedFactor = 1 / (1 + speed * 0.0025);
     const targetSteering = -control.steer * cfg.maxSteering * speedFactor;
-    // Réactivité du braquage réduite de 15 % à toutes les vitesses, à angle cible identique.
-    // Réduction supplémentaire progressive de 50 à 200 km/h, jusqu'à 50 %.
-    const highSpeedResponse = 1 - 0.5 * THREE.MathUtils.smoothstep(speed * 3.6, 50, 200);
-    const steeringResponse = 6 * 0.85 * highSpeedResponse;
+    // Réduire aussi la réactivité à basse vitesse pour atténuer l'écart avec la haute vitesse.
+    // Le facteur retrouve son réglage précédent à partir de 150 km/h.
+    const baseResponse = THREE.MathUtils.lerp(0.7, 0.85, THREE.MathUtils.smoothstep(speed * 3.6, 50, 150));
+    // Réduction supplémentaire progressive de 50 à 180 km/h, jusqu'à 65 %.
+    const highSpeedResponse = 1 - 0.65 * THREE.MathUtils.smoothstep(speed * 3.6, 50, 180);
+    // En drift rapide, retrouver progressivement la réactivité complète du volant.
+    const driftResponse = this.drifting ? THREE.MathUtils.smoothstep(speed * 3.6, 80, 180) : 0;
+    const steeringResponse = 6 * baseResponse * THREE.MathUtils.lerp(highSpeedResponse, 1, driftResponse);
     // Retour au centre inchangé.
     const steerLerp = control.steer === 0 ? 8 * dt : steeringResponse * dt;
     this.currentSteering += (targetSteering - this.currentSteering) * Math.min(1, steerLerp);
@@ -199,11 +211,6 @@ export class VehicleController {
       const powerCurve = 1 - 0.6 * Math.min(1, speed / cfg.maxSpeed);
       engine = overMax ? 0 : control.throttle * cfg.engineForce * powerCurve;
     }
-    const brakeInput = Math.max(control.brake, Number(control.handbrake));
-    // Le virage amorce la glisse en marche avant ; en marche arrière, Bas
-    // doit rester une commande moteur même si le joueur tourne.
-    this.drifting = brakeInput > 0 && this.forwardSpeed > 0.5
-      && (this.drifting || control.steer !== 0);
     if (brakeInput > 0) {
       if (this.forwardSpeed > 0.5 || control.throttle > 0 || control.handbrake) {
         // Les deux touches freinent pareil ; seul Bas peut engager la marche arrière.
@@ -260,7 +267,9 @@ export class VehicleController {
       this._v.set(0, 1, 0).applyQuaternion(this._q);
       const angularVelocity = this.body.angvel();
       const yawRate = this._v.dot(angularVelocity);
-      const maxYawRate = DRIFT_MAX_YAW_RATE / (1 + speed / DRIFT_YAW_SPEED_SCALE);
+      const yawSpeedReduction = Math.min(speed, DRIFT_YAW_HIGH_SPEED_THRESHOLD) / DRIFT_YAW_SPEED_SCALE
+        + Math.max(0, speed - DRIFT_YAW_HIGH_SPEED_THRESHOLD) / DRIFT_YAW_HIGH_SPEED_SCALE;
+      const maxYawRate = DRIFT_MAX_YAW_RATE / (1 + yawSpeedReduction);
       const correction = yawRate - THREE.MathUtils.clamp(yawRate, -maxYawRate, maxYawRate);
       if (correction !== 0) {
         // Modifier uniquement le lacet, sans toucher au roulis ni au tangage.

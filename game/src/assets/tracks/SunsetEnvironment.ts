@@ -179,6 +179,7 @@ export function buildSunsetEnvironment(
 
   // At night, each range has its own radial band, entirely beyond the green hills.
   // A valley separates the bands so their slopes cannot intersect.
+  const ridges: THREE.Mesh[] = [];
   for (let layer = 0; layer < 2; layer++) {
     const positions: number[] = [];
     const indices: number[] = [];
@@ -212,6 +213,7 @@ export function buildSunsetEnvironment(
     }));
     ridge.name = `sunset-ridge-${layer}`;
     environment.add(ridge);
+    ridges.push(ridge);
   }
 
   const trunks: Instance[] = [];
@@ -233,17 +235,7 @@ export function buildSunsetEnvironment(
   // the complete centre of the circuit or blocking sight lines at the barriers.
   clusters.push({ x: -8, z: -42 }, { x: 1, z: 14 }, { x: 10, z: -49 });
 
-  for (let attempt = 0; attempt < 680; attempt++) {
-    const cluster = clusters[Math.floor(rng() * clusters.length)];
-    const angle = rng() * Math.PI * 2;
-    const spread = Math.sqrt(rng()) * 24;
-    const x = cluster.x + Math.cos(angle) * spread;
-    const z = cluster.z + Math.sin(angle) * spread;
-    const scale = 0.7 + rng() * 0.85;
-    const conifer = rng() < 0.42;
-    const crownRadius = (conifer ? 2.3 : 3.8) * scale;
-    if (roadDistance(x, z) < clearance + crownRadius) continue;
-    const y = terrainHeight(x, z);
+  const addTree = (x: number, y: number, z: number, scale: number, conifer: boolean): void => {
     const height = (conifer ? 10 : 7.6) * scale;
     const trunkHeight = height * 0.67;
     trunks.push({ x, y: y + trunkHeight / 2, z,
@@ -271,6 +263,19 @@ export function buildSunsetEnvironment(
         });
       }
     }
+  };
+
+  for (let attempt = 0; attempt < 680; attempt++) {
+    const cluster = clusters[Math.floor(rng() * clusters.length)];
+    const angle = rng() * Math.PI * 2;
+    const spread = Math.sqrt(rng()) * 24;
+    const x = cluster.x + Math.cos(angle) * spread;
+    const z = cluster.z + Math.sin(angle) * spread;
+    const scale = 0.7 + rng() * 0.85;
+    const conifer = rng() < 0.42;
+    const crownRadius = (conifer ? 2.3 : 3.8) * scale;
+    if (roadDistance(x, z) < clearance + crownRadius) continue;
+    addTree(x, terrainHeight(x, z), z, scale, conifer);
   }
 
   // Stones, low shrubs and tufts occupy distinct loose patches, with a clear
@@ -303,6 +308,51 @@ export function buildSunsetEnvironment(
         }
       }
     }
+  }
+
+  // Keep the distant, haze-coloured ridges bare. Plant only on the green meadow
+  // and its hills, skipping places where a ridge covers the meadow surface.
+  const mountainRay = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
+  const surfaceHeight = (x: number, z: number): number | undefined => {
+    mountainRay.ray.origin.set(x, 300, z);
+    const hit = mountainRay.intersectObjects(ridges, false)[0];
+    const onMeadow = Math.abs(x) <= 350 && Math.abs(z) <= 350;
+    if (!onMeadow) return undefined;
+    const y = terrainHeight(x, z);
+    return hit && hit.point.y > y ? undefined : y;
+  };
+  const hillsideClusters = Array.from({ length: 36 }, (_, i) => {
+    const angle = i / 36 * Math.PI * 2 + rng() * 0.15;
+    const radius = flatRadius + 35 + rng() * (hillCrestRadius - flatRadius - 10);
+    return { x: center.x + Math.cos(angle) * radius, z: center.z + Math.sin(angle) * radius };
+  });
+  for (let attempt = 0; attempt < 1100; attempt++) {
+    const cluster = hillsideClusters[Math.floor(rng() * hillsideClusters.length)];
+    const angle = rng() * Math.PI * 2;
+    const spread = Math.sqrt(rng()) * 32;
+    const x = cluster.x + Math.cos(angle) * spread;
+    const z = cluster.z + Math.sin(angle) * spread;
+    const radial = Math.hypot(x - center.x, z - center.z);
+    if (radial < flatRadius + 18 || radial > hillOuterRadius - 10) continue;
+    const y = surfaceHeight(x, z);
+    if (y === undefined) continue;
+    addTree(x, y, z, 0.75 + rng() * 0.85, rng() < 0.85);
+  }
+
+  // Extra tufts fill both the meadow and the lower slopes without multiplying
+  // rocks or shrubs, and retain the maintained verge beside the asphalt.
+  for (let attempt = 0; attempt < 6800; attempt++) {
+    const hillside = rng() < 0.25;
+    const angle = rng() * Math.PI * 2;
+    const radius = flatRadius + 15 + rng() * (hillCrestRadius - flatRadius);
+    const x = center.x + (hillside ? Math.cos(angle) * radius : (rng() - 0.5) * 320);
+    const z = center.z + (hillside ? Math.sin(angle) * radius : (rng() - 0.5) * 320);
+    const distance = roadDistance(x, z);
+    if (distance < clearance + 1.4 || (!hillside && distance > 85)) continue;
+    const y = hillside ? surfaceHeight(x, z) : terrainHeight(x, z);
+    if (y === undefined) continue;
+    grass.push({ x, y, z, sx: 0.7 + rng(), sy: 0.5 + rng() * 0.65, sz: 0.7 + rng(),
+      yaw: rng() * Math.PI * 2, color: colorFrom([0xb8b485, 0xa6b278, 0xc0b58a]) });
   }
 
   const foliageMaterial = new THREE.MeshStandardMaterial({ roughness: 1 });

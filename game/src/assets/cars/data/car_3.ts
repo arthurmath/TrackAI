@@ -1,7 +1,7 @@
 import type { VehicleConfig } from '../types';
 import { car_1 } from './car_1';
 
-const SIZE_SCALE = 0.85;
+const SIZE_SCALE = 0.75;
 
 /** Trackmania 2020 France, with dimensions and wheel anchors matched to the GLB. */
 export const car_3: VehicleConfig = {
@@ -29,7 +29,7 @@ export const car_3: VehicleConfig = {
     z: wheel.z * SIZE_SCALE,
   })),
   modelPath: '/models/cars/trackmania-france/trackmania-france.glb',
-  // The export includes a 1/85 scale. This gives a car about 3.18 × 1.80 m.
+  // The export includes a 1/85 scale. This gives a car about 2.81 × 1.59 m.
   modelScale: 0.84 * SIZE_SCALE,
   // Keep all four tires on the road instead of lifting the front axle visually.
   modelPitch: 0,
