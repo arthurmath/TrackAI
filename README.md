@@ -158,7 +158,12 @@ La vitesse obtenue ne vient pas d’une accélération fixée directement : elle
 
 En pratique, c’est donc un modèle de conduite simplifié : pas de régime moteur, de vitesses ou de courbe de couple détaillée. La courbe de force est définie dans VehicleController.ts:145, la touche ↑ dans InputManager.ts:36, et les paramètres du véhicule dans car_1.ts:10.
 
+## Tests
 
+```bash
+cd game
+node --test tests/*.test.mjs
+```
 
 
 
