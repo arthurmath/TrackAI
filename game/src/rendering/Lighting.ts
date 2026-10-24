@@ -131,7 +131,13 @@ export class Lighting {
     this.hemi.color.set(lighting.skyColor);
     this.hemi.groundColor.set(lighting.groundColor);
     this.hemi.intensity = lighting.hemiIntensity;
-    this.sky.visible = lighting.skyStyle === 'sunset';
+    this.sky.visible = lighting.skyStyle !== undefined;
+    const day = lighting.skyStyle === 'day';
+    this.sky.material.uniforms.zenithColor.value.set(day ? 0x64b2e8 : 0x719dc1);
+    this.sky.material.uniforms.horizonColor.value.set(day ? 0xc9e1ed : 0xe0e1d1);
+    this.sky.material.uniforms.lowerColor.value.set(day ? 0xb9cdb3 : 0xbac7b5);
+    this.sky.material.uniforms.sunsetColor.value.set(day ? 0xfff1d6 : 0xf6d4aa);
+    this.sky.material.uniforms.cloudColor.value.set(day ? 0xffffff : 0xfff4e4);
     this.sky.material.uniforms.sunDirection.value.copy(sunDir);
 
     // Ciel + brouillard assortis.

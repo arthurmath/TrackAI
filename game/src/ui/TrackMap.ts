@@ -17,12 +17,14 @@ function escapeAttribute(value: string): string {
 
 /** Keep this curve identical to the playable track, including its arc lengths. */
 function trackCurve(track: TrackDefinition): CatmullRomCurve3 {
-  return new CatmullRomCurve3(
+  const curve = new CatmullRomCurve3(
     track.centerline.map((point) => new Vector3(point.x, point.y, point.z)),
     true,
     'centripetal',
     0.5,
   );
+  curve.arcLengthDivisions = Math.max(200, track.segments * 2);
+  return curve;
 }
 
 export function trackLengthMeters(track: TrackDefinition): number {

@@ -15,7 +15,9 @@ import type { VehicleSpawn } from '../../physics/VehicleController';
 import { AssetLoader } from '../../utils/AssetLoader';
 import { buildRacewayCircuit, createRacewayAsphalt } from './RacewayCircuit';
 import { buildSunsetEnvironment } from './SunsetEnvironment';
+import { buildMountainEnvironment } from './MountainEnvironment';
 import { tuneStadiumMaterials } from './StadiumEnvironment';
+import { trackBankAngle, trackLateral, trackOrientation } from './TrackBanking';
 
 export interface BuiltTrack {
   group: THREE.Group;
@@ -30,8 +32,6 @@ export interface BuiltTrack {
   setCenterlineVisible(visible: boolean): void;
   dispose(): void;
 }
-
-const UP = new THREE.Vector3(0, 1, 0);
 
 /** Angle minimal (rad) entre segments de bord avant d'appliquer un chanfrein. */
 const BEVEL_ANGLE_MIN = 0.02;
@@ -115,13 +115,13 @@ function computeOffsetPolyline(
   tangents: THREE.Vector3[],
   halfWidth: number,
   side: 'left' | 'right',
+  banking: TrackDefinition['banking'],
 ): THREE.Vector3[] {
   const N = center.length;
   const sign = side === 'left' ? 1 : -1;
   const offsets = new Array<number>(N);
   const dIn = new THREE.Vector3();
   const dOut = new THREE.Vector3();
-  const normal = new THREE.Vector3();
 
   for (let i = 0; i < N; i++) {
     const prev = center[(i - 1 + N) % N];
@@ -147,7 +147,7 @@ function computeOffsetPolyline(
   const smoothed = smoothCircular(offsets, 10);
   const result: THREE.Vector3[] = new Array(N);
   for (let i = 0; i < N; i++) {
-    normal.crossVectors(UP, tangents[i]).multiplyScalar(sign);
+    const normal = trackLateral(tangents[i], trackBankAngle(i / N, banking)).multiplyScalar(sign);
     result[i] = center[i].clone().addScaledVector(normal, smoothed[i]);
   }
 
@@ -181,12 +181,14 @@ export class TrackConstructor {
     const useModelBarriers = useGLB && !!this.assetLoader && !!def.modelBarrierMaterials?.length;
     const midnight = def.scenery === 'midnight-park';
     const park = def.scenery === 'sunset-park' || midnight;
+    const alpine = def.scenery === 'alpine-forest';
     const raceway = def.roadStyle === 'raceway';
     const signage = {
       title: def.name.toUpperCase(),
-      subtitle: midnight ? '02 / MOONLIT RACEWAY' : park ? '01 / FOREST RACEWAY' : '03 / STADIUM RACEWAY',
+      subtitle: alpine ? '05 / ALPINE FOREST' : midnight ? '02 / MOONLIT RACEWAY' : park ? '01 / FOREST RACEWAY' : '03 / STADIUM RACEWAY',
       chevrons: midnight ? [0.12, 0.23, 0.34, 0.47, 0.56, 0.67, 0.8, 0.9]
-        : park ? [0.12, 0.36, 0.55, 0.76] : [0.18, 0.39, 0.61, 0.82],
+        : alpine ? [0.15, 0.25, 0.31, 0.37, 0.4, 0.54, 0.61, 0.65, 0.71, 0.78, 0.84, 0.91]
+          : park ? [0.12, 0.36, 0.55, 0.76] : [0.18, 0.39, 0.61, 0.82],
     };
 
     const group = new THREE.Group();
@@ -198,6 +200,8 @@ export class TrackConstructor {
       'centripetal',
       0.5,
     );
+    curve.arcLengthDivisions = Math.max(200, def.segments * 2);
+    curve.updateArcLengths();
     const length = curve.getLength();
 
     // Corps fixe portant tous les colliders du circuit.
@@ -215,8 +219,8 @@ export class TrackConstructor {
       tangents.push(t);
     }
 
-    const leftEdge = computeOffsetPolyline(samples, tangents, half, 'left');
-    const rightEdge = computeOffsetPolyline(samples, tangents, half, 'right');
+    const leftEdge = computeOffsetPolyline(samples, tangents, half, 'left', def.banking);
+    const rightEdge = computeOffsetPolyline(samples, tangents, half, 'right', def.banking);
 
     // --- Route ---
     this.buildRoad(group, trackBody, leftEdge, rightEdge, def, showTrackVisuals);
@@ -233,11 +237,12 @@ export class TrackConstructor {
     // --- Sol ---
     // Park scenery already supplies the full meadow mesh. Keep only the base
     // collider: the two flat surfaces are 8 mm apart and z-fight when zoomed out.
-    this.buildGround(group, trackBody, def, !useGLB && !park);
+    this.buildGround(group, trackBody, def, !useGLB && !park && !alpine);
 
     // --- Décor (ignoré quand le GLB fournit l'environnement) ---
     if (!useGLB) {
       if (park) buildSunsetEnvironment(group, samples, def.roadWidth, midnight);
+      else if (alpine) this.buildMountainScenery(group, trackBody, samples, def);
       else this.buildDecorations(group, def);
     }
 
@@ -245,14 +250,13 @@ export class TrackConstructor {
 
     // --- Ligne de départ / arrivée ---
     const startU = def.startU ?? 0;
-    this.buildStartLine(group, curve, startU, def.roadWidth);
+    this.buildStartLine(group, curve, startU, def.roadWidth, trackBankAngle(startU, def.banking));
 
     // --- Spawn ---
     const sp = curve.getPointAt(startU);
     const st = curve.getTangentAt(startU).normalize();
     sp.addScaledVector(st, -(def.spawnOffset ?? 0));
-    const yaw = Math.atan2(st.x, st.z);
-    const spawnQuat = new THREE.Quaternion().setFromAxisAngle(UP, yaw);
+    const spawnQuat = trackOrientation(st, trackBankAngle(startU, def.banking));
     const spawn: VehicleSpawn = {
       position: new THREE.Vector3(sp.x, sp.y + 1.2, sp.z),
       quaternion: spawnQuat,
@@ -289,9 +293,11 @@ export class TrackConstructor {
           this.buildBarrier(group, trackBody, leftEdge, def.barrierHeight, 0x3344ff, !raceway);
           this.buildBarrier(group, trackBody, rightEdge, def.barrierHeight, 0xff3344, !raceway);
         }
-        this.buildGround(group, trackBody, def, !park);
+        this.buildGround(group, trackBody, def, !park && !alpine);
         if (park) {
           buildSunsetEnvironment(group, samples, def.roadWidth, midnight);
+        } else if (alpine) {
+          this.buildMountainScenery(group, trackBody, samples, def);
         } else this.buildDecorations(group, def);
       }
     }
@@ -434,6 +440,7 @@ export class TrackConstructor {
       metalness: 0.0,
     });
     const mesh = new THREE.Mesh(geo, mat);
+    mesh.name = 'track-road';
     mesh.receiveShadow = true;
     if (visible) group.add(mesh);
     else { geo.dispose(); mat.dispose(); }
@@ -564,6 +571,27 @@ export class TrackConstructor {
     this.world.createCollider(collider, body);
   }
 
+  /** Le terrain et les talus partagent leur géométrie visible avec la physique. */
+  private buildMountainScenery(
+    group: THREE.Group,
+    body: RAPIER.RigidBody,
+    samples: THREE.Vector3[],
+    def: TrackDefinition,
+  ): void {
+    const terrain = buildMountainEnvironment(group, samples, def.roadWidth, def.groundSize, def.banking);
+    const embankments = group.getObjectByName('alpine-road-embankments');
+    const surfaces = [terrain];
+    if (embankments instanceof THREE.Mesh) surfaces.push(embankments.geometry);
+    for (const geometry of surfaces) {
+      const vertices = geometry.getAttribute('position');
+      const indices = geometry.getIndex()!;
+      this.world.createCollider(RAPIER.ColliderDesc.trimesh(
+        new Float32Array(vertices.array),
+        new Uint32Array(indices.array),
+      ).setFriction(0.85).setRestitution(0), body);
+    }
+  }
+
   private buildGround(
     group: THREE.Group,
     body: RAPIER.RigidBody,
@@ -647,10 +675,10 @@ export class TrackConstructor {
     curve: THREE.CatmullRomCurve3,
     startU: number,
     roadWidth: number,
+    bankAngle: number,
   ): void {
     const p = curve.getPointAt(startU);
     const t = curve.getTangentAt(startU).normalize();
-    const yaw = Math.atan2(t.x, t.z);
 
     // Damier noir/blanc en plan posé sur la route.
     const cols = 16;
@@ -671,7 +699,7 @@ export class TrackConstructor {
       }
     }
     lineGroup.position.copy(p);
-    lineGroup.rotation.y = yaw;
+    lineGroup.quaternion.copy(trackOrientation(t, bankAngle));
     group.add(lineGroup);
   }
 }

@@ -12,7 +12,7 @@ export interface Vec3 {
 
 export interface TrackLighting {
   /** Atmosphère procédurale facultative, réservée aux circuits qui l'activent. */
-  skyStyle?: 'sunset';
+  skyStyle?: 'sunset' | 'day';
   skyColor: number;
   groundColor: number;
   fogColor?: number;
@@ -61,6 +61,11 @@ export interface TrackDefinition {
   /** Subdivisions le long de la courbe (qualité du maillage). */
   segments: number;
 
+  /** Dévers localisés, en progression métrique [0..1], avec transitions lissées.
+   * Angle en degrés : positif relève le bord gauche (UP × tangente).
+   */
+  banking?: { startU: number; endU: number; angle: number }[];
+
   /** Adhérence de la route (friction du collider). */
   roadFriction: number;
   /** Gravité spécifique au circuit. */
@@ -73,7 +78,7 @@ export interface TrackDefinition {
   groundColor: number;
 
   /** Ensemble de décors et de matériaux procéduraux propre au circuit. */
-  scenery?: 'sunset-park' | 'midnight-park';
+  scenery?: 'sunset-park' | 'midnight-park' | 'alpine-forest';
 
   /** Asphalte texturé, vibreurs et glissières partagés entre les circuits. */
   roadStyle?: 'raceway';

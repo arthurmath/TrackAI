@@ -66,7 +66,7 @@ function edgeRibbon(
   const graphite = new THREE.Color(0x333e43);
   let distance = 0;
   const point = (i: number, p: readonly [number, number]): THREE.Vector3 => {
-    const normal = edge[i].clone().sub(centers[i]).setY(0).normalize();
+    const normal = edge[i].clone().sub(centers[i]).normalize();
     return edge[i].clone().addScaledVector(normal, p[0]).add(new THREE.Vector3(0, p[1], 0));
   };
   for (let i = 0; i < edge.length; i++) {
@@ -165,7 +165,7 @@ export function buildRacewayCircuit(
     let reflectSpacing = 10;
     for (let i = 0; i < edge.length; i++) {
       const step = edge[i].distanceTo(edge[(i + 1) % edge.length]);
-      const outward = edge[i].clone().sub(centers[i]).setY(0).normalize();
+      const outward = edge[i].clone().sub(centers[i]).normalize();
       if (spacing >= 4) {
         postPositions.push(edge[i].clone().addScaledVector(outward, 0.2));
         spacing = 0;
@@ -208,13 +208,15 @@ export function buildRacewayCircuit(
   const tangent = curve.getTangentAt(startU);
   gantry.rotation.y = Math.atan2(tangent.x, tangent.z);
   const span = roadWidth + 2.2;
+  const beamHeight = 1.4;
+  const beamCenterY = 6.2;
+  const postHeight = beamCenterY - beamHeight / 2;
   for (const side of [-1, 1]) {
-    box(gantry, 0.85, 6.7, 0.8, side * span / 2, 3.35, 0, dark);
+    box(gantry, 0.85, postHeight, 0.8, side * span / 2, postHeight / 2, 0, dark);
     box(gantry, 0.89, 0.16, 0.84, side * span / 2, 1.4, 0, amber);
     box(gantry, 1.25, 0.4, 1.2, side * span / 2, 0.2, 0, concrete);
   }
-  box(gantry, span + 0.9, 1.4, 0.65, 0, 6.2, 0, dark);
-  box(gantry, span + 0.9, 0.08, 0.7, 0, 5.48, 0, amber);
+  box(gantry, span + 0.9, beamHeight, 0.65, 0, beamCenterY, 0, dark);
   const signMaterial = new THREE.MeshStandardMaterial({ map: signTexture(signage.title, signage.subtitle), roughness: 0.7 });
   for (const side of [-1, 1]) {
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(8.8, 2.2), signMaterial);
@@ -235,7 +237,7 @@ export function buildRacewayCircuit(
     const ahead = curve.getTangentAt((u + 0.025) % 1);
     const turn = t.x * ahead.z - t.z * ahead.x;
     const edge = turn > 0 ? left : right;
-    const outward = edge[i].clone().sub(centers[i]).setY(0).normalize();
+    const outward = edge[i].clone().sub(centers[i]).normalize();
     const signGroup = new THREE.Group();
     signGroup.position.copy(edge[i]).addScaledVector(outward, 2.9);
     signGroup.rotation.y = Math.atan2(-t.x, -t.z);

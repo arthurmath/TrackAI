@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import type { VehicleConfig } from './types';
 import type { WheelTransform } from '../../physics/VehicleController';
 import { AssetLoader } from '../../utils/AssetLoader';
+import { CarSpeedometer } from './CarSpeedometer';
 
 const DEFAULT_WHEEL_NAMES = ['Wheel_FL', 'Wheel_FR', 'Wheel_RL', 'Wheel_RR'];
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
@@ -213,8 +214,11 @@ export class VehicleView {
   private readonly wheelAnimation: 'full' | 'steer-only' | 'none';
   private readonly visualSteerScale: number;
   private readonly bodyMaterial: THREE.MeshStandardMaterial;
+  private readonly speedometerMaterialName?: string;
+  private speedometer?: CarSpeedometer;
 
   constructor(config: VehicleConfig) {
+    this.speedometerMaterialName = config.speedometerMaterialName;
     this.restingWheelPositions = config.wheelConnections.map(wheel =>
       new THREE.Vector3(wheel.x, wheel.y - config.suspensionRestLength, wheel.z));
     this.wheelAnimation = config.wheelAnimation ?? 'full';
@@ -284,6 +288,9 @@ export class VehicleView {
       }
     });
     this.group.add(model);
+    this.speedometer = this.speedometerMaterialName
+      ? new CarSpeedometer(model, this.speedometerMaterialName)
+      : undefined;
     if (this.wheelAnimation === 'none') return;
 
     if (this.wheelAnimation === 'steer-only') {
@@ -340,9 +347,10 @@ export class VehicleView {
     });
   }
 
-  update(position: THREE.Vector3, quaternion: THREE.Quaternion, wheels: WheelTransform[]): void {
+  update(position: THREE.Vector3, quaternion: THREE.Quaternion, wheels: WheelTransform[], speedKmh = 0): void {
     this.group.position.copy(position);
     this.group.quaternion.copy(quaternion);
+    this.speedometer?.update(speedKmh);
     for (let i = 0; i < this.wheelMeshes.length; i++) {
       const pivot = this.wheelMeshes[i];
       const physIdx = this.wheelPhysicsIndices[i] ?? i;
@@ -378,7 +386,10 @@ export class VehicleView {
 }
 
 export class CarConstructor {
-  constructor(private readonly assetLoader?: AssetLoader) {}
+  constructor(
+    private readonly assetLoader?: AssetLoader,
+    private readonly environmentMap?: THREE.Texture,
+  ) {}
 
   async build(config: VehicleConfig): Promise<VehicleView> {
     const view = new VehicleView(config);
@@ -430,12 +441,30 @@ export class CarConstructor {
               roughness: 0.35,
             })
           : null;
+        const materials = new Map<THREE.Material, THREE.Material>();
+        const prepareMaterial = (original: THREE.Material): THREE.Material => {
+          if (!this.environmentMap || config.modelEnvironmentIntensity === undefined
+            || !(original instanceof THREE.MeshStandardMaterial)) return original;
+          let material = materials.get(original);
+          if (!material) {
+            // Cached GLB materials are shared by previews and racing agents.
+            const clone = original.clone();
+            clone.envMap = this.environmentMap;
+            clone.envMapIntensity = config.modelEnvironmentIntensity;
+            material = clone;
+            materials.set(original, material);
+          }
+          return material;
+        };
         modelRoot.traverse((obj) => {
           if ((obj as THREE.Mesh).isMesh) {
             const mesh = obj as THREE.Mesh;
             mesh.castShadow = true;
             mesh.receiveShadow = true;
             if (overrideMat) mesh.material = overrideMat;
+            mesh.material = Array.isArray(mesh.material)
+              ? mesh.material.map(prepareMaterial)
+              : prepareMaterial(mesh.material);
           }
         });
         const wheelNames = config.wheelMeshNames ?? DEFAULT_WHEEL_NAMES;

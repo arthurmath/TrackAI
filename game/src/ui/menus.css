@@ -160,7 +160,7 @@
 #menus .selection-footer { display: flex; gap: 22px; justify-content: space-between; align-items: center; padding: 24px 0 30px; }
 #menus .selection-footer > .primary { min-width: 245px; justify-content: space-between; }
 #menus .selection-help { font-size: 11px; color: #858d84; }
-#menus .track-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 17px; }
+#menus .track-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 17px; }
 #menus .track-card { display: block; min-width: 0; padding: 0; border: 1px solid #ffffff25; border-radius: 5px; background: #1a1e1f; color: #f1f2ea; text-align: left; cursor: pointer; overflow: hidden; transition: transform .18s, border-color .18s; }
 #menus .track-card:hover { transform: translateY(-4px); border-color: var(--track-accent); }
 #menus .track-card.selected { border-color: var(--menu-lime); box-shadow: 0 0 0 1px var(--menu-lime); }

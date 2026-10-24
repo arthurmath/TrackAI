@@ -29,6 +29,7 @@ export const car_3: VehicleConfig = {
     z: wheel.z * SIZE_SCALE,
   })),
   modelPath: '/models/cars/trackmania-france/trackmania-france.glb',
+  modelEnvironmentIntensity: 0.3,
   // The export includes a 1/85 scale. This gives a car about 2.81 × 1.59 m.
   modelScale: 0.84 * SIZE_SCALE,
   // Keep all four tires on the road instead of lifting the front axle visually.
@@ -40,6 +41,7 @@ export const car_3: VehicleConfig = {
     radius: 0.16 * SIZE_SCALE,
   },
   wheelAnimation: 'full',
+  speedometerMaterialName: 'Details',
   alignVisualSteeringToTrajectory: true,
   wheelMeshNames: ['Wheel_FL', 'Wheel_FR', 'Wheel_RL', 'Wheel_RR'],
 };

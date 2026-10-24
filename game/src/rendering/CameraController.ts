@@ -71,7 +71,9 @@ export class CameraController {
       );
       this.desiredPos.copy(carPos).add(this._offset);
       this.lookTarget.copy(carPos);
-      this.lookTarget.y += CAMERA_CONFIG.chaseLookAtHeight;
+      this.lookTarget.y += mode === 'far'
+        ? CAMERA_CONFIG.farLookAtHeight
+        : CAMERA_CONFIG.chaseLookAtHeight;
       if (mode === 'chase') {
         this.desiredPos.y += chaseHeightOffset;
         this.lookTarget.y += chaseHeightOffset;

@@ -3,12 +3,18 @@
  * Gère le redimensionnement, le pixel ratio et les ombres.
  */
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { GRAPHICS_CONFIG, CAMERA_CONFIG } from '../config';
 
 export class SceneManager {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene: THREE.Scene;
   readonly camera: THREE.PerspectiveCamera;
+  private readonly carEnvironment: THREE.WebGLRenderTarget;
+
+  get carEnvironmentMap(): THREE.Texture {
+    return this.carEnvironment.texture;
+  }
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -27,6 +33,17 @@ export class SceneManager {
     }
 
     this.scene = new THREE.Scene();
+
+    // Match the garage's image-based lighting for reflective car paint. Keep it
+    // off scene.environment so the circuit's materials retain their lighting.
+    const studio = new RoomEnvironment();
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    try {
+      this.carEnvironment = pmrem.fromScene(studio, 0.04);
+    } finally {
+      studio.dispose();
+      pmrem.dispose();
+    }
 
     this.camera = new THREE.PerspectiveCamera(
       CAMERA_CONFIG.baseFov,
@@ -54,6 +71,7 @@ export class SceneManager {
 
   dispose(): void {
     window.removeEventListener('resize', this.resize);
+    this.carEnvironment.dispose();
     this.renderer.dispose();
   }
 }

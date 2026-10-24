@@ -203,7 +203,10 @@ class App {
 
     this.session = await RaceSession.create(
       this.scene.scene, this.lighting, vehicleConfig, trackDef, controllers,
-      { trainingMode: this.aiMode === 'training' },
+      {
+        trainingMode: this.aiMode === 'training',
+        carEnvironmentMap: this.scene.carEnvironmentMap,
+      },
     );
     this.menus.setProgress(1);
     this.session.track.setCenterlineVisible(this.showCenterline);

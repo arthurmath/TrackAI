@@ -87,12 +87,14 @@ export class RaceSession {
     vehicleConfig: VehicleConfig,
     trackDef: TrackDefinition,
     controllers: Controller[],
-    options?: { trainingMode?: boolean },
+    options?: { trainingMode?: boolean; carEnvironmentMap?: THREE.Texture },
   ): Promise<RaceSession> {
     const physics = new PhysicsWorld(trackDef.gravity);
     const assetLoader = new AssetLoader();
     const trackFactory = new TrackConstructor(physics.world, scene, assetLoader);
-    const carFactory = new CarConstructor(assetLoader);
+    // Midnight Circuit keeps its moonlit materials without the garage fill light.
+    const carEnvironmentMap = trackDef.id === 'track_2' ? undefined : options?.carEnvironmentMap;
+    const carFactory = new CarConstructor(assetLoader, carEnvironmentMap);
     const track = await trackFactory.build(trackDef);
     // Une vue par véhicule (le circuit n'est construit qu'une fois).
     const views = await Promise.all(controllers.map(() => carFactory.build(vehicleConfig)));
@@ -221,7 +223,8 @@ export class RaceSession {
 
         // Le recorder ne suit que l'agent principal.
         if (i === 0) {
-          this.race.update(dt, progress);
+          const raceProgress = (progress - (this.trackDef.startU ?? 0) + 1) % 1;
+          this.race.update(dt, raceProgress);
         }
 
         // Respawn auto si retournée trop longtemps ou tombée sous la map.
@@ -264,7 +267,7 @@ export class RaceSession {
       agent.renderPos.lerpVectors(agent.prevPos, agent.currPos, alpha);
       agent.renderQuat.copy(agent.prevQuat).slerp(agent.currQuat, alpha);
       agent.vehicle.getWheelTransforms(agent.wheelTransforms);
-      agent.view.update(agent.renderPos, agent.renderQuat, agent.wheelTransforms);
+      agent.view.update(agent.renderPos, agent.renderQuat, agent.wheelTransforms, agent.vehicle.speedKmh);
     }
     this.lighting.followTarget(this.primary.renderPos);
     this.tireSmoke.render();

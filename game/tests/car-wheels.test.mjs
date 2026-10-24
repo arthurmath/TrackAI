@@ -19,7 +19,8 @@ async function sourceModule(relative, dependencies = {}) {
 const base = await sourceModule('../src/assets/cars/data/car_1.ts');
 const { module: { car_3 } } = await sourceModule('../src/assets/cars/data/car_3.ts', { './car_1': base.url });
 const { module: { car_2 } } = await sourceModule('../src/assets/cars/data/car_2.ts');
-const { module: { CarConstructor } } = await sourceModule('../src/assets/cars/CarConstructor.ts');
+const speedometer = await sourceModule('../src/assets/cars/CarSpeedometer.ts');
+const { module: { CarConstructor } } = await sourceModule('../src/assets/cars/CarConstructor.ts', { './CarSpeedometer': speedometer.url });
 
 async function geometryOnlyModel(relative) {
   const input = await readFile(new URL(relative, import.meta.url));
@@ -71,6 +72,95 @@ function verifySamples(samples, expected) {
     close(actual, expected(sample.position.clone()), sample.object.material.name);
   }
 }
+
+test('Trackmania removes all three raised static glyphs and preserves the cached panel', async () => {
+  const model = await geometryOnlyModel(modelPath);
+  const originalMeshes = new Map();
+  model.traverse(object => {
+    if (object.isMesh) originalMeshes.set(object.name, { geometry: object.geometry, count: object.geometry.index.count });
+  });
+  const view = await new CarConstructor({ tryLoadModel: async () => model }).build(car_3);
+  let changedMeshes = 0;
+  view.group.traverse(object => {
+    if (!object.isMesh) return;
+    const original = originalMeshes.get(object.name);
+    if (!original || original.geometry === object.geometry) return;
+    changedMeshes++;
+    const source = original.geometry;
+    assert.equal(source.index.count, original.count, 'Cached model geometry remains intact');
+    assert.equal(source.index.count - object.geometry.index.count, 336 * 3);
+    const remaining = new Set();
+    const kept = object.geometry.index.array;
+    for (let i = 0; i < kept.length; i += 3) remaining.add(`${kept[i]},${kept[i + 1]},${kept[i + 2]}`);
+    const removedPerDigit = [0, 0, 0];
+    const position = source.getAttribute('position');
+    const indices = source.index.array;
+    for (let i = 0; i < indices.length; i += 3) {
+      const triangle = [indices[i], indices[i + 1], indices[i + 2]];
+      if (remaining.has(triangle.join(','))) continue;
+      const centerX = triangle.reduce((total, index) => total + position.getX(index), 0) / 3;
+      removedPerDigit[centerX < -5 ? 0 : centerX > 5 ? 2 : 1]++;
+      for (const index of triangle) {
+        assert.ok(position.getY(index) < 40.1, 'Top trim stays intact');
+        assert.ok(position.getY(index) > 28.49, 'Bottom trim stays intact');
+        assert.ok(Math.abs(position.getX(index)) < 14.57, 'Only static digit geometry is removed');
+      }
+    }
+    assert.deepEqual(removedPerDigit, [112, 112, 112]);
+  });
+  assert.equal(changedMeshes, 1, 'Only the mesh containing the three static glyphs changes');
+  view.dispose();
+});
+
+test('Trackmania speed digits follow km/h independently for cached model clones', async () => {
+  const model = await geometryOnlyModel(modelPath);
+  const constructor = new CarConstructor({ tryLoadModel: async () => model });
+  const first = await constructor.build(car_3);
+  const second = await constructor.build(car_3);
+  const details = root => {
+    const materials = new Set();
+    root.traverse(object => {
+      if (object.isMesh && object.material.name === 'Details') materials.add(object.material);
+    });
+    return [...materials];
+  };
+  const sourceMaterial = details(model)[0];
+  const firstMaterials = details(first.group);
+  const secondMaterial = details(second.group)[0];
+  assert.equal(firstMaterials.length, 1, 'Reuse one display material per car');
+  assert.notEqual(firstMaterials[0], sourceMaterial);
+  assert.notEqual(firstMaterials[0], secondMaterial);
+  const compile = material => {
+    const shader = {
+      uniforms: {},
+      vertexShader: THREE.ShaderLib.standard.vertexShader,
+      fragmentShader: THREE.ShaderLib.standard.fragmentShader,
+    };
+    material.onBeforeCompile(shader, null);
+    assert.ok(shader.vertexShader.includes('vSpeedometerUv = uv;'));
+    assert.ok(shader.fragmentShader.includes('#include <map_fragment>'));
+    // Replacing only diffuse/emission leaves the original embossed digits
+    // visible in the normal/metalness reflections. Mask the final lit result.
+    const displayOverride = shader.fragmentShader.indexOf('outgoingLight = mix(outgoingLight, speedometerColor, speedometerArea);');
+    assert.ok(displayOverride > shader.fragmentShader.indexOf('#include <lights_fragment_end>'));
+    assert.ok(displayOverride > shader.fragmentShader.indexOf('#include <normal_fragment_maps>'));
+    assert.ok(displayOverride < shader.fragmentShader.indexOf('#include <opaque_fragment>'));
+    assert.ok(shader.fragmentShader.indexOf('#include <tonemapping_fragment>') > displayOverride);
+    return shader.uniforms.speedometerSegments.value;
+  };
+  const firstSegments = compile(firstMaterials[0]);
+  const secondSegments = compile(secondMaterial);
+  const masks = [63, 6, 91, 79, 102, 109, 125, 7, 127, 111];
+  for (const [speed, text] of [[0, '000'], [9, '009'], [10, '010'], [99, '099'],
+    [100, '100'], [128.6, '129'], [456, '456'], [789, '789'], [-42, '042'],
+    [1500, '999'], [NaN, '000']]) {
+    first.update(origin, identity, restWheels(), speed);
+    assert.deepEqual(firstSegments.toArray(), [...text].map(digit => masks[Number(digit)]));
+    assert.deepEqual(secondSegments.toArray(), [63, 63, 63], 'Preview/other car stays at zero');
+  }
+  first.dispose();
+  second.dispose();
+});
 
 test('each complete wheel includes tires, inner details and painted rims', async () => {
   const scene = await geometryOnlyModel(modelPath);

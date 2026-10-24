@@ -63,8 +63,12 @@ export interface VehicleConfig {
   modelOffset?: Vec3;
   /** Couleur uniforme appliquée à tous les meshes du modèle (remplace les matériaux). */
   modelColor?: number;
+  /** Intensité de l'environnement du garage appliqué au modèle en course. */
+  modelEnvironmentIntensity?: number;
   /** Casque noir visuel : position locale au châssis et rayon en mètres. */
   driverHelmet?: { position: Vec3; radius: number };
+  /** Matériau de l'atlas contenant les trois chiffres du compteur Trackmania. */
+  speedometerMaterialName?: string;
   /**
    * Animation visuelle des roues nommées :
    * - `full` : position + braquage + roulement (roues avec origine au centre de leur axe)

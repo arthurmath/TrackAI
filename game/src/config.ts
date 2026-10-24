@@ -14,9 +14,11 @@ export const PHYSICS_CONFIG = {
 
 export const CAMERA_CONFIG = {
   /** Décalage de la chase cam derrière/au-dessus de la voiture (espace local voiture). */
-  chaseOffset: { x: 0, y: 2.7, z: -6.4 },
+  chaseOffset: { x: 0, y: 2.4, z: -4.6 },
   /** Point visé légèrement au-dessus de la voiture. */
-  chaseLookAtHeight: 1.2,
+  chaseLookAtHeight: 1.4,
+  /** Hauteur de visée de la vue cinématique surélevée. */
+  farLookAtHeight: 1.2,
   /** Réactivité du décalage de caméra lors des changements de cap. */
   positionLerp: 6.0,
   /** Amortissement de la rotation. */
