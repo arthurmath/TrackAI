@@ -1,11 +1,8 @@
 ## Start project
 
-cd ai  
-uv sync  
-cd ..  
-cd game  
-npm install  
-npm run dev  
+cd ai && uv sync 
+cd ../game && npm install 
+npm run dev
 
 
 ## Manually start the python server
@@ -201,13 +198,12 @@ node --test tests/*.test.mjs
 
 ## Backlog : 
 
-- bug sur les virages relevés dérapage trop facile
+- bug sur les virages relevés dérapage trop facile et roues wobble
 - Changements d'altitude, des virages inclinés, un saut/une rampe, et un looping ou boost pad si possible. **Contrôle de l'assiette en vol** réglage de l'assiette (tangage) et du roulis en plein vol, à la manière de Trackmania.
-- Faire un menu système solaire, l'utilisateur peut choisir la planète et, pour chaque planète, il y aura un stade d'entrainement pour tester la gravité, les mécaniques de jeu etc. et plusieurs circuits dans cet environnement. La dernière track du jeu sera un parcours multi planètes style course arc en ciel Mariokart avec une fin dans le soleil ou trou noir. Surfaces modifiant la vitesse (par exemple, zones à faible adhérence / de terre). @Orlanouille
+- Faire un menu système solaire, l'utilisateur peut choisir la planète et, pour chaque planète, il y aura un stade d'entrainement pour tester la gravité, les mécaniques de jeu etc. et plusieurs circuits dans cet environnement. La dernière track du jeu sera un parcours multi planètes style course arc en ciel Mariokart avec une fin dans le soleil ou trou noir. Surfaces modifiant la vitesse (par exemple, zones à faible adhérence / de terre). 
 - Ghost car (meilleur temps) : Enregistrement de la position/rotation toutes les 100ms via un `GhostRecorder`, Stockage dans `localStorage` (format JSON compressé), Replay semi-transparent pendant la course suivante.
-- Ajouter un ou deux points de visée (lookahead): direction vers un point sur la courbe centrale 10 /25m devant. Comme ça l'agent voit le virage. (a faire avant le système de checkpoints) @Jean808
+- Ajouter un ou deux points de visée (lookahead): direction vers un point sur la courbe centrale 10 /25m devant. Comme ça l'agent voit le virage. (a faire avant le système de checkpoints) 
 - **Système de checkpoints :** A mettre dans src/track/Checkpoint.ts. Volumes de déclenchement invisibles ; doivent être franchis dans l'ordre ; chronométrage intermédiaire (écart en temps réel par rapport au record personnel (vert/rouge)). Permettra le respawn si reset (touche R) ou si voiture retournée.
 - Musique/Effet sonores
 - Cycle jour/nuit 
 - Multijoueur avec contact 
-- Nitro quand on dérape ? 

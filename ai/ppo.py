@@ -49,10 +49,6 @@ class ActorCritic(nn.Module):
         std = self.log_std.clamp(min=LOG_ACTION_STD_MIN).exp().expand_as(mean)
         return Normal(mean, std)
 
-    def clamp_action_std_min(self):
-        with torch.no_grad():
-            self.log_std.clamp_(min=LOG_ACTION_STD_MIN)
-
     def act(self, state):
         dist = self._dist(state)
         action = torch.clamp(dist.sample(), -1.0, 1.0)
@@ -67,11 +63,14 @@ class ActorCritic(nn.Module):
         state_values = self.critic(state)
         return action_logprobs, state_values, dist_entropy
 
+    def clamp_action_std_min(self):
+        with torch.no_grad():
+            self.log_std.clamp_(min=LOG_ACTION_STD_MIN)
+
 
 class Agent:
     def __init__(self, state_dim, action_dim, layers, lr_actor, lr_critic,
-                 gamma, epochs, eps, c1, c2, gae_lambda, batch_size,
-                 action_std_init=0.6):
+                 gamma, epochs, eps, c1, c2, gae_lambda, batch_size, action_std_init=0.6):
         self.epochs = epochs
         self.gamma = gamma
         self.eps = eps
