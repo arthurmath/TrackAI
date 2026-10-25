@@ -83,7 +83,7 @@ class App {
     // Décor de fond pour les menus (lumière douce + ciel).
     this.lighting.apply(getTrackById(DEFAULT_TRACK_ID).lighting);
 
-    this.loop = new GameLoop(this.fixedUpdate, this.render);
+    this.loop = new GameLoop(this.fixedUpdate, this.render, () => this.input.update());
 
     window.addEventListener('resize', () => {
       this.post.setSize(window.innerWidth, window.innerHeight);
@@ -111,6 +111,7 @@ class App {
       },
       onAI: () => this.goToAIMenu(),
       onEditor: () => alert('Éditeur de circuits : à venir.'),
+      onConnectGamepad: () => this.input.connectGamepad(),
     });
   }
 
@@ -286,6 +287,7 @@ class App {
   };
 
   private render = (alpha: number, frameDt: number): void => {
+    this.menus.updateGamepadStatus(this.input.gamepadStatus);
     const trainingView = this.aiMode === 'training' && this.orbitCamera.isActive;
 
     if (this.session) {

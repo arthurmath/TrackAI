@@ -31,7 +31,8 @@ export const car_2: VehicleConfig = {
     engineForce: 9200,
     brakeForce: 160,
     maxSpeed: 82,
-    centerOfMassOffset: { x: 0.00, y: -0.28880, z: 0.00 },
+    // Centre de masse proche du sol : le freinage ne doit pas délester l'essieu arrière.
+    centerOfMassOffset: { x: 0.00, y: -0.55, z: 0.00 },
 
     modelPath: '/models/cars/f1/source/f1.glb',
     /** Échelle réduite de 9,75 % au total : longueur 3,61 m, largeur 1,51 m. */

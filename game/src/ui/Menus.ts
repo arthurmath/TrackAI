@@ -97,7 +97,7 @@ export class Menus {
   }
 
   // ---------- Menu principal ----------
-  showMain(cb: { onPlay: () => void; onAI: () => void; onEditor: () => void }): void {
+  showMain(cb: { onPlay: () => void; onAI: () => void; onEditor: () => void; onConnectGamepad: () => Promise<void> }): void {
     const featured = CARS.find((car) => car.modelPath) ?? CARS[0];
     const s = this.screen(`
       <section class="home-hero">
@@ -121,12 +121,28 @@ export class Menus {
         <button class="mode-card ai-mode" id="m-ai"><span class="mode-icon"><svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="m7 7 18 9-18 9V7Zm0 0 18 18M7 25 25 7" stroke="currentColor" stroke-width="1.5"/><circle cx="7" cy="7" r="3" fill="currentColor"/><circle cx="25" cy="7" r="3" fill="currentColor"/><circle cx="25" cy="25" r="3" fill="currentColor"/><circle cx="7" cy="25" r="3" fill="currentColor"/></svg></span><span class="mode-copy"><small>02 / L’INTELLIGENCE EN PISTE</small><strong>AI Lab</strong><span>Entraînez un agent. Observez ses progrès.</span></span><span class="mode-arrow">${arrow}</span></button>
         <button class="mode-card editor-mode" id="m-editor" disabled><span class="mode-icon"><svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="m16 4 12 7-12 7L4 11 16 4ZM4 17l12 7 12-7M4 23l12 7 12-7" stroke="currentColor" stroke-width="1.6"/></svg></span><span class="mode-copy"><small>03 / IMAGINEZ LA SUITE</small><strong>Éditeur de circuits</strong><span>De nouvelles lignes à inventer.</span></span><span class="soon-badge">BIENTÔT</span></button>
       </section>
+      <div class="gamepad-connection">
+        <button class="btn" id="m-connect-gamepad" type="button">Connecter la manette USB PowerA</button>
+        <span id="m-gamepad-status" role="status" aria-live="polite">PowerA USB : cliquez sur « Connecter la manette ».</span>
+      </div>
       <details class="controls-guide"><summary><span class="keyboard-icon" aria-hidden="true">⌨</span> LES COMMANDES <span>+</span></summary><div class="control-keys"><span><kbd>Z / ↑</kbd> Accélérer</span><span><kbd>S / ↓</kbd> Freiner et reculer</span><span><kbd>Q D / ← →</kbd> Tourner</span><span><kbd>Espace</kbd> Frein à main</span><span><kbd>C</kbd> Caméra</span><span><kbd>R</kbd> Replacer</span><span><kbd>Échap</kbd> Pause</span></div></details>
+      <details class="controls-guide"><summary><span aria-hidden="true">🎮</span> MANETTE <span>+</span></summary><div class="control-keys"><span><kbd>Stick gauche</kbd> Tourner</span><span><kbd>ZR / RT</kbd> Accélérer</span><span><kbd>ZL / LT</kbd> Freiner et reculer</span><span><kbd>B (Switch) / A (Xbox)</kbd> Frein à main</span><span><kbd>Y (Switch) / B (Xbox)</kbd> Replacer</span><span><kbd>A (Switch) / Y (Xbox)</kbd> Caméra</span><span><kbd>+ / Start</kbd> Pause et reprendre</span></div><p class="hint"></p></details>
     `, 'home', 'Accueil');
     s.querySelector('#m-play')!.addEventListener('click', cb.onPlay);
     s.querySelector('#m-race')!.addEventListener('click', cb.onPlay);
     s.querySelector('#m-ai')!.addEventListener('click', cb.onAI);
+    const connectButton = s.querySelector<HTMLButtonElement>('#m-connect-gamepad')!;
+    connectButton.addEventListener('click', async () => {
+      connectButton.disabled = true;
+      try { await cb.onConnectGamepad(); }
+      finally { connectButton.disabled = false; }
+    });
     this.setPreview(s.querySelector('#home-preview')!, getCarPreview(featured));
+  }
+
+  updateGamepadStatus(message: string): void {
+    const status = this.container.querySelector('#m-gamepad-status');
+    if (status && status.textContent !== message) status.textContent = message;
   }
 
   private optionPickerHtml(

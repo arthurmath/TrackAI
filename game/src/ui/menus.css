@@ -109,6 +109,8 @@
 #menus .mode-arrow { margin-left: auto; align-self: flex-end; color: var(--mode-color); }
 #menus .mode-arrow svg { width: 21px; height: 21px; }
 #menus .soon-badge { position: absolute; top: 14px; right: 13px; font-size: 7px; letter-spacing: 1px; border: 1px solid #b2a1ff40; color: #c8bbef; padding: 4px 5px; border-radius: 2px; }
+#menus .gamepad-connection { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 20px; margin: 0 0 22px; padding: 16px; border: 1px solid var(--menu-border); border-radius: 4px; }
+#menus .gamepad-connection > span { flex: 1 1 240px; min-width: 0; color: #aab0aa; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
 #menus .controls-guide { margin-bottom: 22px; }
 #menus .controls-guide summary { list-style: none; display: flex; align-items: center; gap: 8px; color: #959d96; font-size: 9px; font-weight: 600; letter-spacing: 1px; cursor: pointer; width: fit-content; padding: 6px 0; }
 #menus .controls-guide summary::-webkit-details-marker { display: none; }

@@ -1,6 +1,6 @@
 /**
- * HumanController — pilotage clavier via l'InputManager.
- * Traduit les axes clavier en ControlState normalisé.
+ * HumanController : pilotage clavier ou manette via l'InputManager.
+ * Traduit les entrées en ControlState normalisé.
  */
 import type { Controller, ControlState } from './Controller';
 import type { InputManager } from '../core/InputManager';
@@ -8,9 +8,10 @@ import type { InputManager } from '../core/InputManager';
 export class HumanController implements Controller {
   readonly kind = 'human' as const;
   private resetRequested = false;
+  private readonly unsubscribeReset: () => void;
 
   constructor(private readonly input: InputManager) {
-    this.input.on('reset', () => {
+    this.unsubscribeReset = this.input.on('reset', () => {
       this.resetRequested = true;
     });
   }
@@ -26,5 +27,9 @@ export class HumanController implements Controller {
       handbrake: this.input.handbrake,
       reset,
     };
+  }
+
+  dispose(): void {
+    this.unsubscribeReset();
   }
 }

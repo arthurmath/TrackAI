@@ -18,6 +18,7 @@ export class GameLoop {
   constructor(
     private readonly fixedUpdate: FixedUpdateFn,
     private readonly render: RenderFn,
+    private readonly beforeUpdate?: () => void,
   ) {}
 
   start(): void {
@@ -42,6 +43,7 @@ export class GameLoop {
     // Clamp pour éviter une avalanche de pas physiques après un freeze (onglet inactif).
     if (frameDt > 0.25) frameDt = 0.25;
 
+    this.beforeUpdate?.();
     this.accumulator += frameDt;
     let steps = 0;
     while (this.accumulator >= this.step && steps < PHYSICS_CONFIG.maxSubSteps) {
