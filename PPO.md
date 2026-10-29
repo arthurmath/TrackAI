@@ -118,12 +118,50 @@ Pendant l’entraînement, une action est **échantillonnée** dans cette distri
 
 L’Actor produit un vecteur moyen $\mu_\theta(s) \in [-1,1]^2$. Un paramètre appris séparément, `log_std`, contient un logarithme d’écart-type par dimension d’action. Ces paramètres sont partagés entre les états ; l’accélération/freinage et la direction peuvent avoir des écarts-types différents.
 
-La distribution utilisée par le code est un produit de lois normales indépendantes :
+La politique gaussienne associe une **densité** à chaque action possible, pour un état donné :
 
 $$
 p_\theta(a\mid s) = \prod_{j=1}^{2}
 \mathcal{N}\bigl(a_j;\mu_{\theta,j}(s),\sigma_j^2\bigr)
 $$
+
+Les notations sont les suivantes :
+
+| Notation | Signification dans ce projet |
+| --- | --- |
+| $s \in \mathbb{R}^{14}$ | L’état observé de la voiture : vitesses, capteurs, lookahead, etc. |
+| $a=(a_1,a_2)$ | Une action particulière dont on veut évaluer la densité |
+| $a_1$ | La commande `drive`, qui règle l’accélération ou le freinage |
+| $a_2$ | La commande `steer`, qui règle la direction |
+| $\mu_{\theta,j}(s)$ | La moyenne prédite par l’Actor pour la composante $j$, dans l’état $s$ |
+| $\sigma_j$ | L’écart-type appris pour cette composante, qui règle la dispersion de l’exploration |
+| $\theta$ | Les paramètres de la politique, dont les poids de l’Actor et les paramètres `log_std` |
+
+Le symbole $\mid$ signifie **« sachant »** : $p_\theta(a\mid s)$ se lit « densité de l’action $a$, sachant que la voiture est dans l’état $s$ ».
+
+**Pourquoi un produit de deux densités normales ?** L’action possède deux composantes, et l’implémentation les échantillonne indépendamment l’une de l’autre **conditionnellement à l’état $s$**. Chacune suit une loi normale avec sa propre moyenne et son propre écart-type. La densité jointe se factorise donc :
+
+$$
+p_\theta(a\mid s)
+= p_\theta(a_1,a_2\mid s)
+= p_\theta(a_1\mid s)\,p_\theta(a_2\mid s)
+$$
+
+C’est un choix de modélisation : la politique ne possède pas de paramètre de corrélation entre les deux composantes. Cela ne signifie pas que les commandes sont indépendantes dans toutes les situations de conduite : leurs deux moyennes dépendent du même état et peuvent, par exemple, favoriser ensemble le freinage et le braquage à l’approche d’un virage.
+
+Dans la formule, $\mathcal{N}(a_j;\mu_{\theta,j}(s),\sigma_j^2)$ désigne la **densité de la loi normale évaluée au nombre $a_j$**, soit :
+
+$$
+\mathcal{N}(a_j;\mu_{\theta,j}(s),\sigma_j^2)
+= \frac{1}{\sqrt{2\pi}\,\sigma_j}
+\exp\left(-\frac{(a_j-\mu_{\theta,j}(s))^2}{2\sigma_j^2}\right)
+$$
+
+**Quelle est la nature de la sortie ?** Pour un état $s$ et une action $a$ fixés, chaque facteur est un nombre, et leur produit $p_\theta(a\mid s)$ est donc **un scalaire positif**, pas un couple. Par exemple, pour $a=(0.7,-0.2)$, on multiplie la densité de `drive` en $0.7$ par celle de `steer` en $-0.2$. Le couple est l’action $a$, ou la moyenne $\mu_\theta(s)$ produite par le réseau ; $p_\theta(\cdot\mid s)$ désigne, lui, la fonction de densité complète sur l’espace des actions.
+
+Une densité n’est pas la probabilité d’obtenir exactement ce couple : pour la gaussienne continue, cette probabilité est nulle. Une probabilité s’obtient en **intégrant la densité sur une région** de l’espace des actions. La densité peut donc dépasser $1$ ; c’est son intégrale sur tout $\mathbb{R}^2$ qui vaut $1$.
+
+Les écarts-types sont calculés à partir de `log_std` :
 
 $$
 \sigma_j = \exp\bigl(\max(\mathrm{log\_std}_j,\log(0.25))\bigr)

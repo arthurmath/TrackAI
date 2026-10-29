@@ -45,13 +45,13 @@ class ActorCritic(nn.Module):
         self.log_std = nn.Parameter(torch.ones(action_dim) * math.log(action_std_init))
 
     def _dist(self, state):
-        mean = self.actor(state)
+        mean = self.actor(state) # tenseur de 2 nombres
         std = self.log_std.clamp(min=LOG_ACTION_STD_MIN).exp().expand_as(mean)
-        return Normal(mean, std)
+        return Normal(mean, std) # objet torch décrivant les 2 lois normales
 
     def act(self, state):
-        dist = self._dist(state)
-        action = torch.clamp(dist.sample(), -1.0, 1.0)
+        dist = self._dist(state)  
+        action = torch.clamp(dist.sample(), -1.0, 1.0) # tenseur de 2 nombres : l’action échantillonnée (écrétée)
         action_logprob = dist.log_prob(action).sum(dim=-1)
         state_val = self.critic(state)
         return action.detach(), action_logprob.detach(), state_val.detach()
@@ -124,9 +124,9 @@ class Agent:
         with torch.no_grad():
             state_t = torch.FloatTensor(state).to(device)
             with self._policy_lock:
-                mean = self.policy_old.actor(state_t)
+                action = self.policy_old.actor(state_t)
                 state_val = self.policy_old.critic(state_t)
-        return mean.tolist(), state_val.item()
+        return action.tolist(), state_val.item()
 
     def act_train(self, state, buffer):
         """Échantillonne une action et la stocke dans le buffer."""
@@ -173,7 +173,6 @@ class Agent:
             delta = buffer.rewards[i] + self.gamma * next_value - values_list[i]
             gae = delta + self.gamma * self.gae_lambda * (0.0 if is_terminal else gae)
             advantages_list[i] = gae
-
         advantages = torch.tensor(advantages_list, dtype=torch.float32, device=device)
         returns = advantages + old_state_values.detach()
 

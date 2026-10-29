@@ -5,39 +5,12 @@ cd ../game && npm install
 npm run dev
 
 
-## Manually start the python server
+### Manually start the python server
 
 cd ai 
 uv run main.py
 
-## Manette
 
-La conduite accepte le clavier et les manettes exposées par l’API Gamepad du navigateur.
-Les manettes au mapping standard et le profil USB brut PowerA NSW Wired Controller
-(`20d6:a713`) sont pris en charge. Après avoir ouvert le jeu, appuyer sur un bouton
-avec l’onglet actif pour permettre sa détection. Les menus se sélectionnent à la souris.
-
-Si la PowerA ne répond pas dans Chrome, utiliser **Connecter la manette USB PowerA**
-dans le menu principal, puis sélectionner **NSW Wired controller** dans le sélecteur
-de Chrome. Cette connexion lit directement les rapports USB via WebHID, même si
-l’API Gamepad ne fournit aucune manette. Elle nécessite localhost ou HTTPS.
-Le statut indique ensuite si la connexion est ouverte et si des commandes sont reçues.
-Les appareils déjà autorisés sont reconnectés automatiquement au prochain chargement.
-
-| Action | PowerA Switch | Xbox |
-| --- | --- | --- |
-| Tourner | Stick gauche | Stick gauche |
-| Accélérer | ZR | RT |
-| Freiner / reculer | ZL | LT |
-| Frein à main | B (bouton du bas) | A |
-| Replacer | Y (bouton de gauche) | B |
-| Caméra | A (bouton de droite) | Y |
-| Pause / reprendre | + | Start |
-
-La direction est progressive, avec une zone morte de 15 % au centre du stick.
-L’accélération et le freinage sont analogiques si les gâchettes de la manette le permettent.
-
----
 
 ## Architecture
 
@@ -164,6 +137,34 @@ flowchart LR
 ```
 
 Chaque frame, `RaceSession` peut pousser une observation (position, capteurs raycast, progression) vers `AIController`, qui relaie les actions reçues du serveur externe.
+
+
+## Manette
+
+La conduite accepte le clavier et les manettes exposées par l’API Gamepad du navigateur.
+Les manettes au mapping standard et le profil USB brut PowerA NSW Wired Controller
+(`20d6:a713`) sont pris en charge. Après avoir ouvert le jeu, appuyer sur un bouton
+avec l’onglet actif pour permettre sa détection. Les menus se sélectionnent à la souris.
+
+Si la PowerA ne répond pas dans Chrome, utiliser **Connecter la manette USB PowerA**
+dans le menu principal, puis sélectionner **NSW Wired controller** dans le sélecteur
+de Chrome. Cette connexion lit directement les rapports USB via WebHID, même si
+l’API Gamepad ne fournit aucune manette. Elle nécessite localhost ou HTTPS.
+Le statut indique ensuite si la connexion est ouverte et si des commandes sont reçues.
+Les appareils déjà autorisés sont reconnectés automatiquement au prochain chargement.
+
+| Action | PowerA Switch | Xbox |
+| --- | --- | --- |
+| Tourner | Stick gauche | Stick gauche |
+| Accélérer | ZR | RT |
+| Freiner / reculer | ZL | LT |
+| Frein à main | B (bouton du bas) | A |
+| Replacer | Y (bouton de gauche) | B |
+| Caméra | A (bouton de droite) | Y |
+| Pause / reprendre | + | Start |
+
+La direction est progressive, avec une zone morte de 15 % au centre du stick.
+L’accélération et le freinage sont analogiques si les gâchettes de la manette le permettent.
 
 
 ## Conduite 
