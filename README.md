@@ -1,13 +1,14 @@
 # TrackAI 
 
-## Start project
+Un réseau de neurones apprend à conduire une voiture sur circuit 3D par **Proximal Policy Optimization (PPO)**, un algorithme d’apprentissage par renforcement. Le jeu envoie des observations à un serveur Python via un WebSocket. Le serveur transforme chaque observation en un vecteur d’état et renvoie les commandes de conduite au jeu. Pendant l’entraînement, l’observation suivante fournit la récompense et le signal de fin d’épisode associés à l’action précédente.
+
+### Start project
 ```bash
 cd ai && uv sync  
 cd ../game && npm install  
 npm run dev
 ```
 
-Un réseau de neurones apprend à conduire une voiture sur circuit 3D par **Proximal Policy Optimization (PPO)**, un algorithme d’apprentissage par renforcement. Le jeu envoie des observations à un serveur Python via un WebSocket. Le serveur transforme chaque observation en un vecteur d’état et renvoie les commandes de conduite au jeu. Pendant l’entraînement, l’observation suivante fournit la récompense et le signal de fin d’épisode associés à l’action précédente.
 
 ## Espace des actions
 
