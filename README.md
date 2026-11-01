@@ -1,8 +1,8 @@
 ## Start project
 
-cd ai && uv sync 
-cd ../game && npm install 
-npm run dev
+cd ai && uv sync  
+cd ../game && npm install  
+npm run dev  
 
 
 ### Manually start the python server
